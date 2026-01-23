@@ -286,43 +286,6 @@ function renderRecordDetail() {
     statusEl.textContent = getRestrictedNotice();
     contentEl.textContent = "";
   }
-
-  if (hasCharterContent && typeof getClearance === "function" && typeof setClearance === "function") {
-    const charterInitiated = localStorage.getItem("gc_charter_initiated");
-    if (charterInitiated === "true") {
-      return;
-    }
-
-    let clearanceUpgradeTriggered = false;
-    let clearanceTimerReady = false;
-
-    const isEligible = () => {
-      if (clearanceUpgradeTriggered || !clearanceTimerReady) {
-        return false;
-      }
-      const rect = contentEl.getBoundingClientRect();
-      return rect.bottom <= window.innerHeight;
-    };
-
-    const tryUpgrade = () => {
-      if (!isEligible()) {
-        return;
-      }
-      clearanceUpgradeTriggered = true;
-      if (getClearance() === "public") {
-        setClearance("registered");
-      }
-      localStorage.setItem("gc_charter_initiated", "true");
-      window.removeEventListener("scroll", tryUpgrade);
-    };
-
-    window.setTimeout(() => {
-      clearanceTimerReady = true;
-      tryUpgrade();
-    }, 20000);
-
-    window.addEventListener("scroll", tryUpgrade, { passive: true });
-  }
 }
 
 function renderProjectsIndex() {
