@@ -1,4 +1,4 @@
-export default function handler(req, res) {
+module.exports = function handler(req, res) {
   // Handle CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -34,4 +34,4 @@ export default function handler(req, res) {
   }
 
   return res.status(405).json({ success: false, error: 'Method not allowed' });
-}
+};
