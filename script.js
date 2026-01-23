@@ -1,5 +1,9 @@
-import { records } from "./records-data.js";
-import { projects } from "./projects-data.js";
+import { records as staticRecords } from "./records-data.js";
+import { projects as staticProjects } from "./projects-data.js";
+
+// Data stores - populated from API or static fallback
+let records = [];
+let projects = [];
 
 // Sets footer year without hard-coding.
 const yearEl = document.querySelector("[data-year]");
@@ -999,15 +1003,57 @@ function initDivisionFilter() {
   });
 }
 
-renderRecordsTable();
-renderRecordDetail();
-renderRelatedRecords();
-renderProjectsIndex();
-renderProjectDetail();
-initRecordForm();
-initProjectForm();
-initAnnotations();
-initDivisionFilter();
-applyClearanceUI();
-initPassphraseInput();
-initRestrictedForms();
+// Data fetching with API-first, static fallback
+async function fetchRecordsData() {
+  try {
+    const response = await fetch("/api/records");
+    const result = await response.json();
+    if (result.success && result.data) {
+      return result.data;
+    }
+  } catch (e) {
+    // API unavailable, fall through to static
+  }
+  return staticRecords;
+}
+
+async function fetchProjectsData() {
+  try {
+    const response = await fetch("/api/projects");
+    const result = await response.json();
+    if (result.success && result.data) {
+      return result.data;
+    }
+  } catch (e) {
+    // API unavailable, fall through to static
+  }
+  return staticProjects;
+}
+
+// Initialize the application
+async function init() {
+  // Fetch data from API (with static fallback)
+  const [recordsData, projectsData] = await Promise.all([
+    fetchRecordsData(),
+    fetchProjectsData()
+  ]);
+
+  records = recordsData;
+  projects = projectsData;
+
+  // Render everything
+  renderRecordsTable();
+  renderRecordDetail();
+  renderRelatedRecords();
+  renderProjectsIndex();
+  renderProjectDetail();
+  initRecordForm();
+  initProjectForm();
+  initAnnotations();
+  initDivisionFilter();
+  applyClearanceUI();
+  initPassphraseInput();
+  initRestrictedForms();
+}
+
+init();
