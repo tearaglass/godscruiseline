@@ -707,10 +707,6 @@ function applyClearanceUI() {
       listItem.hidden = !(href === "system.html" || href === "records.html");
       return;
     }
-    if (href === "divisions.html") {
-      listItem.hidden = clearanceRank < getClearanceRank("authorized");
-      return;
-    }
     if (href === "dashboard.html") {
       listItem.hidden = !isAdmin();
       return;

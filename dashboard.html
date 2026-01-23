@@ -13,7 +13,6 @@
         <nav aria-label="Primary">
           <ul>
             <li><a href="system.html">System</a></li>
-            <li><a href="divisions.html">Divisions</a></li>
             <li><a href="records.html">Records</a></li>
             <li><a href="projects.html">Projects</a></li>
             <li><a href="access.html">Access</a></li>
@@ -30,6 +29,7 @@
         <div class="dashboard-tabs">
           <button type="button" class="tab-btn active" data-tab="records">Records</button>
           <button type="button" class="tab-btn" data-tab="projects">Projects</button>
+          <button type="button" class="tab-btn" data-tab="divisions">Divisions</button>
         </div>
 
         <!-- Records Tab -->
@@ -121,6 +121,38 @@
 
           <p class="meta" data-projects-empty hidden>No projects found.</p>
           <p class="meta" data-projects-loading hidden>Loading projects...</p>
+        </div>
+
+        <!-- Divisions Tab -->
+        <div class="tab-content" data-tab-content="divisions" style="display: none;">
+          <p>Each division maintains its own records, workflows, and reporting cycles.</p>
+
+          <ul class="section-list">
+            <li id="broadcast">
+              <strong>Broadcast</strong>
+              <p class="meta">Signal distribution, public notices, and official transmissions.</p>
+            </li>
+            <li id="works">
+              <strong>Works</strong>
+              <p class="meta">Production registry, asset stewardship, and release protocols.</p>
+            </li>
+            <li id="research">
+              <strong>Research</strong>
+              <p class="meta">Study archives, field documentation, and internal publications.</p>
+            </li>
+            <li id="narrative">
+              <strong>Narrative</strong>
+              <p class="meta">Continuity records, editorial standards, and historical accounts.</p>
+            </li>
+            <li id="exchange">
+              <strong>Exchange</strong>
+              <p class="meta">Partner access, licensing, and controlled distribution.</p>
+            </li>
+            <li id="access">
+              <strong>Access</strong>
+              <p class="meta">Credentialing, clearance audits, and participation review.</p>
+            </li>
+          </ul>
         </div>
 
         <!-- Record Modal -->
