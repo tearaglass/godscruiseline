@@ -221,6 +221,7 @@ function openCreateModal() {
   recordForm.querySelector('[data-field="id"]').disabled = false;
   modalNotice.hidden = true;
   modal.hidden = false;
+  modal.style.display = "flex";
 }
 
 function openEditModal(record) {
@@ -250,10 +251,12 @@ function openEditModal(record) {
   recordForm.querySelector('[data-field="id"]').disabled = true;
 
   modal.hidden = false;
+  modal.style.display = "flex";
 }
 
 function closeModal() {
   modal.hidden = true;
+  modal.style.display = "none";
   editingId = null;
   recordForm.reset();
 }
@@ -262,10 +265,12 @@ function openDeleteModal(id) {
   deleteId = id;
   deleteIdEl.textContent = id;
   deleteModal.hidden = false;
+  deleteModal.style.display = "flex";
 }
 
 function closeDeleteModal() {
   deleteModal.hidden = true;
+  deleteModal.style.display = "none";
   deleteId = null;
 }
 
@@ -410,5 +415,14 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// Initialize
+// Initialize - ensure modals are hidden
+if (modal) {
+  modal.hidden = true;
+  modal.style.display = "none";
+}
+if (deleteModal) {
+  deleteModal.hidden = true;
+  deleteModal.style.display = "none";
+}
+
 fetchRecords();
