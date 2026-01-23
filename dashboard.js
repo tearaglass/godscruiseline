@@ -113,7 +113,8 @@ tabBtns.forEach(btn => {
     tabContents.forEach(c => {
       const isActive = c.dataset.tabContent === tab;
       c.classList.toggle("active", isActive);
-      c.hidden = !isActive;
+      // Use style.display instead of hidden attribute to avoid CSS conflicts
+      c.style.display = isActive ? "block" : "none";
     });
 
     // Load data for tab if needed
