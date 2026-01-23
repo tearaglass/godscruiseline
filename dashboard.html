@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gods Cruiseline — Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <p class="site-title">Gods Cruiseline</p>
+        <nav aria-label="Primary">
+          <ul>
+            <li><a href="system.html">System</a></li>
+            <li><a href="divisions.html">Divisions</a></li>
+            <li><a href="records.html">Records</a></li>
+            <li><a href="projects.html">Projects</a></li>
+            <li><a href="access.html">Access</a></li>
+            <li><a href="dashboard.html" aria-current="page">Dashboard</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <main>
+        <h1>Records Dashboard</h1>
+        <p class="meta" data-dashboard-notice hidden></p>
+
+        <!-- Action bar -->
+        <div class="dashboard-actions">
+          <button type="button" data-action="create">New Record</button>
+          <button type="button" data-action="export">Export JSON</button>
+          <button type="button" data-action="refresh">Refresh</button>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-row">
+          <label for="dashboard-division-filter" class="filter-label">Division</label>
+          <select id="dashboard-division-filter" data-filter="division">
+            <option value="">All</option>
+            <option value="broadcast">Broadcast</option>
+            <option value="works">Works</option>
+            <option value="research">Research</option>
+            <option value="narrative">Narrative</option>
+            <option value="exchange">Exchange</option>
+            <option value="access">Access</option>
+          </select>
+
+          <label for="dashboard-status-filter" class="filter-label">Status</label>
+          <select id="dashboard-status-filter" data-filter="status">
+            <option value="">All</option>
+            <option value="public">Public</option>
+            <option value="registered">Registered</option>
+            <option value="authorized">Authorized</option>
+            <option value="restricted">Restricted</option>
+          </select>
+
+          <label for="dashboard-search" class="filter-label">Search</label>
+          <input type="text" id="dashboard-search" data-filter="search" placeholder="Search by ID or title..." />
+        </div>
+
+        <!-- Records table -->
+        <table class="table dashboard-table">
+          <thead>
+            <tr>
+              <th scope="col" data-sort="id">ID</th>
+              <th scope="col" data-sort="title">Title</th>
+              <th scope="col" data-sort="division">Division</th>
+              <th scope="col" data-sort="year">Year</th>
+              <th scope="col" data-sort="status">Status</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody data-dashboard-body></tbody>
+        </table>
+
+        <p class="meta" data-dashboard-empty hidden>No records found.</p>
+        <p class="meta" data-dashboard-loading>Loading records...</p>
+
+        <!-- Modal for create/edit -->
+        <div class="modal-overlay" data-modal hidden>
+          <div class="modal">
+            <div class="modal-header">
+              <h2 data-modal-title>New Record</h2>
+              <button type="button" class="modal-close" data-action="close-modal">&times;</button>
+            </div>
+            <form class="form modal-form" data-record-form>
+              <p class="meta" data-modal-notice hidden></p>
+
+              <div class="form-grid">
+                <div>
+                  <label for="modal-id">Record ID</label>
+                  <input id="modal-id" name="id" type="text" placeholder="GC-R-###" required data-field="id" />
+                </div>
+
+                <div>
+                  <label for="modal-title">Title</label>
+                  <input id="modal-title" name="title" type="text" required data-field="title" />
+                </div>
+
+                <div>
+                  <label for="modal-division">Division</label>
+                  <select id="modal-division" name="division" required data-field="division">
+                    <option value="broadcast">broadcast</option>
+                    <option value="works">works</option>
+                    <option value="research">research</option>
+                    <option value="narrative">narrative</option>
+                    <option value="exchange">exchange</option>
+                    <option value="access">access</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="modal-medium">Medium</label>
+                  <select id="modal-medium" name="medium" required data-field="medium">
+                    <option value="text">text</option>
+                    <option value="audio">audio</option>
+                    <option value="video">video</option>
+                    <option value="system">system</option>
+                    <option value="image">image</option>
+                    <option value="dataset">dataset</option>
+                    <option value="artifact">artifact</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="modal-year">Year</label>
+                  <input id="modal-year" name="year" type="number" required data-field="year" />
+                </div>
+
+                <div>
+                  <label for="modal-status">Status</label>
+                  <select id="modal-status" name="status" required data-field="status">
+                    <option value="public">public</option>
+                    <option value="registered">registered</option>
+                    <option value="authorized">authorized</option>
+                    <option value="restricted">restricted</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="modal-author">Author</label>
+                  <input id="modal-author" name="author" type="text" placeholder="Comma-separated" data-field="author" />
+                </div>
+
+                <div>
+                  <label for="modal-origin">Origin</label>
+                  <input id="modal-origin" name="origin" type="text" data-field="origin" />
+                </div>
+
+                <div>
+                  <label for="modal-source-ref">Source Ref</label>
+                  <input id="modal-source-ref" name="source_ref" type="text" data-field="source_ref" />
+                </div>
+
+                <div>
+                  <label for="modal-date-created">Date Created</label>
+                  <input id="modal-date-created" name="date_created" type="date" data-field="date_created" />
+                </div>
+
+                <div>
+                  <label for="modal-date-published">Date Published</label>
+                  <input id="modal-date-published" name="date_published" type="date" data-field="date_published" />
+                </div>
+
+                <div>
+                  <label for="modal-tags">Tags</label>
+                  <input id="modal-tags" name="tags" type="text" placeholder="Comma-separated" data-field="tags" />
+                </div>
+
+                <div>
+                  <label for="modal-project">Projects</label>
+                  <input id="modal-project" name="project" type="text" placeholder="Comma-separated" data-field="project" />
+                </div>
+
+                <div>
+                  <label for="modal-sensitivity-level">Sensitivity Level</label>
+                  <input id="modal-sensitivity-level" name="sensitivity_level" type="text" data-field="sensitivity_level" />
+                </div>
+
+                <div>
+                  <label for="modal-archival-state">Archival State</label>
+                  <select id="modal-archival-state" name="archival_state" data-field="archival_state">
+                    <option value="active">active</option>
+                    <option value="archived">archived</option>
+                    <option value="decayed">decayed</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="modal-archival-since">Archival Since</label>
+                  <input id="modal-archival-since" name="archival_since" type="number" data-field="archival_since" />
+                </div>
+              </div>
+
+              <div>
+                <label for="modal-content">Content</label>
+                <textarea id="modal-content" name="content" rows="4" data-field="content"></textarea>
+              </div>
+
+              <div>
+                <label for="modal-sensitivity-note">Sensitivity Note</label>
+                <textarea id="modal-sensitivity-note" name="sensitivity_note" rows="2" data-field="sensitivity_note"></textarea>
+              </div>
+
+              <div>
+                <label for="modal-archival-note">Archival Note</label>
+                <textarea id="modal-archival-note" name="archival_note" rows="2" data-field="archival_note"></textarea>
+              </div>
+
+              <div>
+                <label for="modal-context">Context / Notes</label>
+                <textarea id="modal-context" name="context" rows="3" data-field="context"></textarea>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" data-action="submit">Save Record</button>
+                <button type="button" data-action="close-modal">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Delete confirmation modal -->
+        <div class="modal-overlay" data-delete-modal hidden>
+          <div class="modal modal-sm">
+            <div class="modal-header">
+              <h2>Confirm Delete</h2>
+              <button type="button" class="modal-close" data-action="close-delete-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+              <p>Delete record <strong data-delete-id></strong>?</p>
+              <p class="meta">This action cannot be undone.</p>
+            </div>
+            <div class="form-actions">
+              <button type="button" data-action="confirm-delete">Delete</button>
+              <button type="button" data-action="close-delete-modal">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer>
+        <div class="footer-grid">
+          <span>Gods Cruiseline Informatics</span>
+          <span>Cycle <span data-year>2026</span></span>
+          <span>Dashboard: GC-DASH-01</span>
+        </div>
+      </footer>
+    </div>
+
+    <script type="module" src="dashboard.js"></script>
+  </body>
+</html>

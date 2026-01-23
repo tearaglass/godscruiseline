@@ -744,8 +744,25 @@ function applyClearanceUI() {
       listItem.hidden = clearanceRank < getClearanceRank("authorized");
       return;
     }
+    if (href === "dashboard.html") {
+      listItem.hidden = !isAdmin();
+      return;
+    }
     listItem.hidden = false;
   });
+
+  // Add dashboard link to nav for admins if not already present
+  if (isAdmin()) {
+    const navUl = document.querySelector("nav ul");
+    if (navUl && !navUl.querySelector('a[href="dashboard.html"]')) {
+      const dashboardLi = document.createElement("li");
+      const dashboardLink = document.createElement("a");
+      dashboardLink.href = "dashboard.html";
+      dashboardLink.textContent = "Dashboard";
+      dashboardLi.appendChild(dashboardLink);
+      navUl.appendChild(dashboardLi);
+    }
+  }
 
   const annotationsSection = document.querySelector("[data-annotations]");
   if (annotationsSection) {
@@ -858,13 +875,119 @@ function initRestrictedForms() {
   });
 }
 
+function renderRelatedRecords() {
+  const listEl = document.querySelector("[data-related-list]");
+  const emptyEl = document.querySelector("[data-related-empty]");
+
+  if (!listEl || !emptyEl) {
+    return;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const recordId = params.get("id");
+  const currentRecord = records.find((entry) => entry.id === recordId);
+
+  if (!currentRecord) {
+    emptyEl.hidden = false;
+    return;
+  }
+
+  const relatedRecords = records.filter((record) => {
+    if (record.id === recordId) {
+      return false;
+    }
+
+    // Same division
+    if (record.division === currentRecord.division) {
+      return true;
+    }
+
+    // Shared project
+    if (currentRecord.project && record.project) {
+      const currentProjects = Array.isArray(currentRecord.project)
+        ? currentRecord.project
+        : [currentRecord.project];
+      const recordProjects = Array.isArray(record.project)
+        ? record.project
+        : [record.project];
+      const hasSharedProject = currentProjects.some((p) =>
+        recordProjects.includes(p)
+      );
+      if (hasSharedProject) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+
+  if (relatedRecords.length === 0) {
+    emptyEl.hidden = false;
+    return;
+  }
+
+  emptyEl.hidden = true;
+  listEl.textContent = "";
+
+  relatedRecords.slice(0, 5).forEach((record) => {
+    const itemEl = document.createElement("li");
+    const linkEl = document.createElement("a");
+    linkEl.href = `record.html?id=${encodeURIComponent(record.id)}`;
+    linkEl.textContent = record.title;
+    linkEl.dataset.status = record.status;
+
+    const metaEl = document.createElement("span");
+    metaEl.className = "meta";
+    metaEl.textContent = ` — ${formatDivision(record.division)}, ${record.year}`;
+
+    itemEl.append(linkEl, metaEl);
+    listEl.appendChild(itemEl);
+  });
+}
+
+function initDivisionFilter() {
+  const filterEl = document.querySelector("[data-division-filter]");
+  const tableBody = document.querySelector("[data-records-body]");
+
+  if (!filterEl || !tableBody) {
+    return;
+  }
+
+  filterEl.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLSelectElement)) {
+      return;
+    }
+
+    const selectedDivision = target.value;
+    const rows = tableBody.querySelectorAll("tr");
+
+    rows.forEach((row) => {
+      if (!selectedDivision) {
+        row.hidden = false;
+        return;
+      }
+
+      const divisionCell = row.children[2];
+      if (!divisionCell) {
+        return;
+      }
+
+      const rowDivision = divisionCell.textContent.toLowerCase();
+      row.hidden = rowDivision !== selectedDivision;
+    });
+  });
+}
+
 renderRecordsTable();
 renderRecordDetail();
+renderRelatedRecords();
 renderProjectsIndex();
 renderProjectDetail();
 initRecordForm();
 initProjectForm();
 initAnnotations();
+initDivisionFilter();
 applyClearanceUI();
 initPassphraseInput();
 initRestrictedForms();
