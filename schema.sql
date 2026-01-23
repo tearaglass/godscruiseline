@@ -1,5 +1,7 @@
--- Supabase schema for Gods Cruiseline Records
--- Run this SQL in the Supabase SQL Editor to create the records table
+-- Supabase schema for Gods Cruiseline
+-- Run this SQL in the Supabase SQL Editor to create tables
+
+-- ============ RECORDS TABLE ============
 
 CREATE TABLE IF NOT EXISTS records (
   id TEXT PRIMARY KEY,                    -- GC-R-###
@@ -55,6 +57,70 @@ CREATE TRIGGER update_records_updated_at
   BEFORE UPDATE ON records
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
+
+-- ============ PROJECTS TABLE ============
+
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,                    -- project-slug
+  name TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL,
+  lead TEXT,
+  scope TEXT,
+  start_year INTEGER,
+  end_year INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create index for common queries
+CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+
+-- Enable Row Level Security
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Allow all operations (protected by API key on server-side)
+CREATE POLICY "Allow all operations" ON projects
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
+
+-- Trigger to auto-update updated_at
+DROP TRIGGER IF EXISTS update_projects_updated_at ON projects;
+CREATE TRIGGER update_projects_updated_at
+  BEFORE UPDATE ON projects
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Seed projects data
+INSERT INTO projects (id, name, description, status, start_year) VALUES
+('signal-architecture', 'Signal Architecture', 'Infrastructure and protocols for broadcast distribution.', 'public', 2023),
+('terminal-ops', 'Terminal Operations', 'Maintenance and development of the information system interface.', 'registered', 2025),
+('continuity-ledger', 'Continuity Ledger', 'Ongoing record of decisions, events, and historical accounts.', 'public', 2020)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============ ADMIN TOKENS TABLE ============
+-- For secure admin authentication (tokens granted in person)
+
+CREATE TABLE IF NOT EXISTS admin_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  token TEXT NOT NULL UNIQUE,
+  label TEXT,                             -- Optional description like "Laney's laptop"
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  last_used TIMESTAMPTZ,
+  revoked BOOLEAN DEFAULT FALSE
+);
+
+-- Enable Row Level Security
+ALTER TABLE admin_tokens ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Allow all operations (protected by API key on server-side)
+CREATE POLICY "Allow all operations" ON admin_tokens
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
+
+-- ============ SEED DATA ============
 
 -- Seed data (existing records from records-data.js)
 -- You can run this after table creation to migrate existing data

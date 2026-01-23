@@ -1,8 +1,9 @@
 /**
- * Dashboard JavaScript for Records Management
+ * Dashboard JavaScript for Records & Projects Management
  */
 
-const API_BASE = "/api/records";
+const RECORDS_API = "/api/records";
+const PROJECTS_API = "/api/projects";
 const ADMIN_STORAGE_KEY = "gc_admin";
 
 // Check admin access
@@ -17,51 +18,75 @@ if (!isAdmin()) {
 
 // State
 let records = [];
-let editingId = null;
-let deleteId = null;
+let projects = [];
+let editingRecordId = null;
+let editingProjectId = null;
+let deleteTarget = { type: null, id: null };
+let publishingProject = null;
 
-// DOM Elements
-const tableBody = document.querySelector("[data-dashboard-body]");
-const loadingEl = document.querySelector("[data-dashboard-loading]");
-const emptyEl = document.querySelector("[data-dashboard-empty]");
+// DOM Elements - General
 const noticeEl = document.querySelector("[data-dashboard-notice]");
-const modal = document.querySelector("[data-modal]");
-const modalTitle = document.querySelector("[data-modal-title]");
-const modalNotice = document.querySelector("[data-modal-notice]");
+
+// DOM Elements - Tabs
+const tabBtns = document.querySelectorAll("[data-tab]");
+const tabContents = document.querySelectorAll("[data-tab-content]");
+
+// DOM Elements - Records
+const recordsBody = document.querySelector("[data-records-body]");
+const recordsLoading = document.querySelector("[data-records-loading]");
+const recordsEmpty = document.querySelector("[data-records-empty]");
+const recordModal = document.querySelector("[data-record-modal]");
+const recordModalTitle = document.querySelector("[data-record-modal-title]");
+const recordModalNotice = document.querySelector("[data-record-modal-notice]");
 const recordForm = document.querySelector("[data-record-form]");
+
+// DOM Elements - Projects
+const projectsBody = document.querySelector("[data-projects-body]");
+const projectsLoading = document.querySelector("[data-projects-loading]");
+const projectsEmpty = document.querySelector("[data-projects-empty]");
+const projectModal = document.querySelector("[data-project-modal]");
+const projectModalTitle = document.querySelector("[data-project-modal-title]");
+const projectModalNotice = document.querySelector("[data-project-modal-notice]");
+const projectForm = document.querySelector("[data-project-form]");
+
+// DOM Elements - Publish Modal
+const publishModal = document.querySelector("[data-publish-modal]");
+const publishModalNotice = document.querySelector("[data-publish-modal-notice]");
+const publishForm = document.querySelector("[data-publish-form]");
+const publishProjectName = document.querySelector("[data-publish-project-name]");
+
+// DOM Elements - Delete Modal
 const deleteModal = document.querySelector("[data-delete-modal]");
 const deleteIdEl = document.querySelector("[data-delete-id]");
 
-// Filters
+// DOM Elements - Filters
 const divisionFilter = document.querySelector('[data-filter="division"]');
 const statusFilter = document.querySelector('[data-filter="status"]');
 const searchFilter = document.querySelector('[data-filter="search"]');
+const projectStatusFilter = document.querySelector('[data-filter="project-status"]');
+const projectSearchFilter = document.querySelector('[data-filter="project-search"]');
 
 // Helper functions
 function showNotice(message, isError = false) {
   if (noticeEl) {
     noticeEl.textContent = message;
     noticeEl.hidden = false;
-    if (isError) {
-      noticeEl.style.color = "#c00";
-    } else {
-      noticeEl.style.color = "";
-    }
-    setTimeout(() => {
-      noticeEl.hidden = true;
-    }, 5000);
+    noticeEl.style.color = isError ? "#c00" : "";
+    setTimeout(() => { noticeEl.hidden = true; }, 5000);
   }
 }
 
-function showModalNotice(message, isError = false) {
-  if (modalNotice) {
-    modalNotice.textContent = message;
-    modalNotice.hidden = false;
-    if (isError) {
-      modalNotice.style.color = "#c00";
-    } else {
-      modalNotice.style.color = "";
-    }
+function hideModal(modal) {
+  if (modal) {
+    modal.hidden = true;
+    modal.style.display = "none";
+  }
+}
+
+function showModal(modal) {
+  if (modal) {
+    modal.hidden = false;
+    modal.style.display = "flex";
   }
 }
 
@@ -79,119 +104,104 @@ function formatArrayField(value) {
   return value;
 }
 
-// API Functions
+// Tab switching
+tabBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    const tab = btn.dataset.tab;
+
+    tabBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    tabContents.forEach(c => {
+      const isActive = c.dataset.tabContent === tab;
+      c.classList.toggle("active", isActive);
+      c.hidden = !isActive;
+    });
+
+    // Load data for tab if needed
+    if (tab === "projects" && projects.length === 0) {
+      fetchProjects();
+    }
+  });
+});
+
+// ============ RECORDS ============
+
 async function fetchRecords() {
   try {
-    loadingEl.hidden = false;
-    emptyEl.hidden = true;
-    tableBody.textContent = "";
+    if (recordsLoading) recordsLoading.hidden = false;
+    if (recordsEmpty) recordsEmpty.hidden = true;
+    if (recordsBody) recordsBody.textContent = "";
 
-    const response = await fetch(API_BASE);
+    const response = await fetch(RECORDS_API);
     const result = await response.json();
 
     if (result.success) {
       records = result.data || [];
-      renderTable();
+      renderRecordsTable();
     } else {
       throw new Error(result.error || "Failed to fetch records");
     }
   } catch (error) {
     showNotice(`Error: ${error.message}`, true);
-    // Fallback to static data if API fails
+    // Fallback to static data
     try {
       const module = await import("./records-data.js");
       records = module.records || [];
-      renderTable();
+      renderRecordsTable();
       showNotice("Using local data (API unavailable)", false);
     } catch (e) {
       showNotice("Failed to load records", true);
     }
   } finally {
-    loadingEl.hidden = true;
+    if (recordsLoading) recordsLoading.hidden = true;
   }
 }
 
-async function createRecord(data) {
-  const response = await fetch(API_BASE, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
-  });
-  return response.json();
-}
-
-async function updateRecord(data) {
-  const response = await fetch(API_BASE, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
-  });
-  return response.json();
-}
-
-async function deleteRecord(id) {
-  const response = await fetch(`${API_BASE}?id=${encodeURIComponent(id)}`, {
-    method: "DELETE"
-  });
-  return response.json();
-}
-
-// Rendering
 function getFilteredRecords() {
   let filtered = [...records];
-
   const division = divisionFilter?.value;
   const status = statusFilter?.value;
   const search = searchFilter?.value?.toLowerCase();
 
-  if (division) {
-    filtered = filtered.filter(r => r.division === division);
-  }
-  if (status) {
-    filtered = filtered.filter(r => r.status === status);
-  }
-  if (search) {
-    filtered = filtered.filter(r =>
-      r.id.toLowerCase().includes(search) ||
-      r.title.toLowerCase().includes(search)
-    );
-  }
-
+  if (division) filtered = filtered.filter(r => r.division === division);
+  if (status) filtered = filtered.filter(r => r.status === status);
+  if (search) filtered = filtered.filter(r =>
+    r.id.toLowerCase().includes(search) || r.title.toLowerCase().includes(search)
+  );
   return filtered;
 }
 
-function renderTable() {
+function renderRecordsTable() {
   const filtered = getFilteredRecords();
-  tableBody.textContent = "";
+  if (recordsBody) recordsBody.textContent = "";
 
   if (filtered.length === 0) {
-    emptyEl.hidden = false;
+    if (recordsEmpty) recordsEmpty.hidden = false;
     return;
   }
-
-  emptyEl.hidden = true;
+  if (recordsEmpty) recordsEmpty.hidden = true;
 
   filtered.forEach(record => {
     const row = document.createElement("tr");
-    row.dataset.id = record.id;
 
-    const idCell = document.createElement("td");
-    idCell.textContent = record.id;
+    const cells = [
+      record.id,
+      record.title,
+      record.division,
+      record.year,
+    ];
 
-    const titleCell = document.createElement("td");
-    titleCell.textContent = record.title;
-
-    const divisionCell = document.createElement("td");
-    divisionCell.textContent = record.division;
-
-    const yearCell = document.createElement("td");
-    yearCell.textContent = record.year;
+    cells.forEach(text => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      row.appendChild(td);
+    });
 
     const statusCell = document.createElement("td");
     const statusSpan = document.createElement("span");
     statusSpan.textContent = record.status;
     statusSpan.className = `status status-${record.status}`;
     statusCell.appendChild(statusSpan);
+    row.appendChild(statusCell);
 
     const actionsCell = document.createElement("td");
     actionsCell.className = "actions-cell";
@@ -199,47 +209,39 @@ function renderTable() {
     const editBtn = document.createElement("button");
     editBtn.textContent = "Edit";
     editBtn.className = "btn-sm";
-    editBtn.addEventListener("click", () => openEditModal(record));
+    editBtn.addEventListener("click", () => openEditRecordModal(record));
 
     const deleteBtn = document.createElement("button");
     deleteBtn.textContent = "Delete";
     deleteBtn.className = "btn-sm btn-danger";
-    deleteBtn.addEventListener("click", () => openDeleteModal(record.id));
+    deleteBtn.addEventListener("click", () => openDeleteModal("record", record.id));
 
     actionsCell.append(editBtn, deleteBtn);
-
-    row.append(idCell, titleCell, divisionCell, yearCell, statusCell, actionsCell);
-    tableBody.appendChild(row);
+    row.appendChild(actionsCell);
+    recordsBody.appendChild(row);
   });
 }
 
-// Modal Functions
-function openCreateModal() {
-  editingId = null;
-  modalTitle.textContent = "New Record";
-  recordForm.reset();
-  recordForm.querySelector('[data-field="id"]').disabled = false;
-  modalNotice.hidden = true;
-  modal.hidden = false;
-  modal.style.display = "flex";
+function openCreateRecordModal() {
+  editingRecordId = null;
+  if (recordModalTitle) recordModalTitle.textContent = "New Record";
+  if (recordForm) recordForm.reset();
+  const idField = recordForm?.querySelector('[data-record-field="id"]');
+  if (idField) idField.disabled = false;
+  if (recordModalNotice) recordModalNotice.hidden = true;
+  showModal(recordModal);
 }
 
-function openEditModal(record) {
-  editingId = record.id;
-  modalTitle.textContent = `Edit ${record.id}`;
-  modalNotice.hidden = true;
+function openEditRecordModal(record) {
+  editingRecordId = record.id;
+  if (recordModalTitle) recordModalTitle.textContent = `Edit ${record.id}`;
+  if (recordModalNotice) recordModalNotice.hidden = true;
 
-  // Populate form
-  const fields = recordForm.querySelectorAll("[data-field]");
-  fields.forEach(field => {
-    const key = field.dataset.field;
+  const fields = recordForm?.querySelectorAll("[data-record-field]");
+  fields?.forEach(field => {
+    const key = field.dataset.recordField;
     let value = record[key];
-
-    // Handle array fields
-    if (["author", "tags", "project"].includes(key)) {
-      value = formatArrayField(value);
-    }
-
+    if (["author", "tags", "project"].includes(key)) value = formatArrayField(value);
     if (field.tagName === "SELECT") {
       field.value = value || field.options[0].value;
     } else {
@@ -247,98 +249,69 @@ function openEditModal(record) {
     }
   });
 
-  // Disable ID field when editing
-  recordForm.querySelector('[data-field="id"]').disabled = true;
+  const idField = recordForm?.querySelector('[data-record-field="id"]');
+  if (idField) idField.disabled = true;
 
-  modal.hidden = false;
-  modal.style.display = "flex";
+  showModal(recordModal);
 }
 
-function closeModal() {
-  modal.hidden = true;
-  modal.style.display = "none";
-  editingId = null;
-  recordForm.reset();
+function closeRecordModal() {
+  hideModal(recordModal);
+  editingRecordId = null;
+  if (recordForm) recordForm.reset();
 }
 
-function openDeleteModal(id) {
-  deleteId = id;
-  deleteIdEl.textContent = id;
-  deleteModal.hidden = false;
-  deleteModal.style.display = "flex";
-}
-
-function closeDeleteModal() {
-  deleteModal.hidden = true;
-  deleteModal.style.display = "none";
-  deleteId = null;
-}
-
-// Form Handling
-async function handleSubmit(event) {
+async function handleRecordSubmit(event) {
   event.preventDefault();
 
   const formData = {};
-  const fields = recordForm.querySelectorAll("[data-field]");
+  const fields = recordForm?.querySelectorAll("[data-record-field]");
 
-  fields.forEach(field => {
-    const key = field.dataset.field;
+  fields?.forEach(field => {
+    const key = field.dataset.recordField;
     let value = field.value.trim();
 
-    // Handle array fields
-    if (["author", "tags", "project"].includes(key)) {
-      value = parseArrayField(value);
-    }
-
-    // Handle numeric fields
-    if (["year", "archival_since"].includes(key) && value) {
-      value = parseInt(value, 10);
-    }
-
-    // Only include non-empty values
-    if (value !== "" && value !== null) {
-      formData[key] = value;
-    }
+    if (["author", "tags", "project"].includes(key)) value = parseArrayField(value);
+    if (["year", "archival_since"].includes(key) && value) value = parseInt(value, 10);
+    if (value !== "" && value !== null) formData[key] = value;
   });
 
   try {
     let result;
-    if (editingId) {
-      formData.id = editingId;
-      result = await updateRecord(formData);
+    if (editingRecordId) {
+      formData.id = editingRecordId;
+      const response = await fetch(RECORDS_API, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+      result = await response.json();
     } else {
-      result = await createRecord(formData);
+      const response = await fetch(RECORDS_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+      result = await response.json();
     }
 
     if (result.success) {
-      closeModal();
-      showNotice(editingId ? "Record updated" : "Record created");
+      closeRecordModal();
+      showNotice(editingRecordId ? "Record updated" : "Record created");
       fetchRecords();
     } else {
-      showModalNotice(result.error || "Operation failed", true);
+      if (recordModalNotice) {
+        recordModalNotice.textContent = result.error || "Operation failed";
+        recordModalNotice.hidden = false;
+        recordModalNotice.style.color = "#c00";
+      }
     }
   } catch (error) {
-    showModalNotice(`Error: ${error.message}`, true);
-  }
-}
-
-async function handleDelete() {
-  if (!deleteId) return;
-
-  try {
-    const result = await deleteRecord(deleteId);
-
-    if (result.success) {
-      closeDeleteModal();
-      showNotice("Record deleted");
-      fetchRecords();
-    } else {
-      showNotice(result.error || "Delete failed", true);
-      closeDeleteModal();
+    if (recordModalNotice) {
+      recordModalNotice.textContent = `Error: ${error.message}`;
+      recordModalNotice.hidden = false;
+      recordModalNotice.style.color = "#c00";
     }
-  } catch (error) {
-    showNotice(`Error: ${error.message}`, true);
-    closeDeleteModal();
   }
 }
 
@@ -357,30 +330,352 @@ function exportRecords() {
   showNotice("Records exported");
 }
 
-// Event Listeners
+// ============ PROJECTS ============
+
+async function fetchProjects() {
+  try {
+    if (projectsLoading) projectsLoading.hidden = false;
+    if (projectsEmpty) projectsEmpty.hidden = true;
+    if (projectsBody) projectsBody.textContent = "";
+
+    const response = await fetch(PROJECTS_API);
+    const result = await response.json();
+
+    if (result.success) {
+      projects = result.data || [];
+      renderProjectsTable();
+    } else {
+      throw new Error(result.error || "Failed to fetch projects");
+    }
+  } catch (error) {
+    showNotice(`Error: ${error.message}`, true);
+    // Fallback to static data
+    try {
+      const module = await import("./projects-data.js");
+      projects = module.projects || [];
+      renderProjectsTable();
+      showNotice("Using local data (API unavailable)", false);
+    } catch (e) {
+      showNotice("Failed to load projects", true);
+    }
+  } finally {
+    if (projectsLoading) projectsLoading.hidden = true;
+  }
+}
+
+function getFilteredProjects() {
+  let filtered = [...projects];
+  const status = projectStatusFilter?.value;
+  const search = projectSearchFilter?.value?.toLowerCase();
+
+  if (status) filtered = filtered.filter(p => p.status === status);
+  if (search) filtered = filtered.filter(p =>
+    p.id.toLowerCase().includes(search) || p.name.toLowerCase().includes(search)
+  );
+  return filtered;
+}
+
+function renderProjectsTable() {
+  const filtered = getFilteredProjects();
+  if (projectsBody) projectsBody.textContent = "";
+
+  if (filtered.length === 0) {
+    if (projectsEmpty) projectsEmpty.hidden = false;
+    return;
+  }
+  if (projectsEmpty) projectsEmpty.hidden = true;
+
+  filtered.forEach(project => {
+    const row = document.createElement("tr");
+
+    const idCell = document.createElement("td");
+    idCell.textContent = project.id;
+    row.appendChild(idCell);
+
+    const nameCell = document.createElement("td");
+    nameCell.textContent = project.name;
+    row.appendChild(nameCell);
+
+    const descCell = document.createElement("td");
+    descCell.textContent = project.description || "";
+    descCell.style.maxWidth = "200px";
+    descCell.style.overflow = "hidden";
+    descCell.style.textOverflow = "ellipsis";
+    descCell.style.whiteSpace = "nowrap";
+    row.appendChild(descCell);
+
+    const statusCell = document.createElement("td");
+    const statusSpan = document.createElement("span");
+    statusSpan.textContent = project.status;
+    statusSpan.className = `status status-${project.status}`;
+    statusCell.appendChild(statusSpan);
+    row.appendChild(statusCell);
+
+    const startCell = document.createElement("td");
+    startCell.textContent = project.start_year || project.startYear || "";
+    row.appendChild(startCell);
+
+    const actionsCell = document.createElement("td");
+    actionsCell.className = "actions-cell";
+
+    const editBtn = document.createElement("button");
+    editBtn.textContent = "Edit";
+    editBtn.className = "btn-sm";
+    editBtn.addEventListener("click", () => openEditProjectModal(project));
+
+    const publishBtn = document.createElement("button");
+    publishBtn.textContent = "Publish";
+    publishBtn.className = "btn-sm";
+    publishBtn.addEventListener("click", () => openPublishModal(project));
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "Delete";
+    deleteBtn.className = "btn-sm btn-danger";
+    deleteBtn.addEventListener("click", () => openDeleteModal("project", project.id));
+
+    actionsCell.append(editBtn, publishBtn, deleteBtn);
+    row.appendChild(actionsCell);
+    projectsBody.appendChild(row);
+  });
+}
+
+function openCreateProjectModal() {
+  editingProjectId = null;
+  if (projectModalTitle) projectModalTitle.textContent = "New Project";
+  if (projectForm) projectForm.reset();
+  const idField = projectForm?.querySelector('[data-project-field="id"]');
+  if (idField) idField.disabled = false;
+  if (projectModalNotice) projectModalNotice.hidden = true;
+  showModal(projectModal);
+}
+
+function openEditProjectModal(project) {
+  editingProjectId = project.id;
+  if (projectModalTitle) projectModalTitle.textContent = `Edit ${project.id}`;
+  if (projectModalNotice) projectModalNotice.hidden = true;
+
+  const fields = projectForm?.querySelectorAll("[data-project-field]");
+  fields?.forEach(field => {
+    const key = field.dataset.projectField;
+    let value = project[key] || project[key.replace(/_/g, "")]; // Handle snake_case vs camelCase
+    if (field.tagName === "SELECT") {
+      field.value = value || field.options[0].value;
+    } else {
+      field.value = value || "";
+    }
+  });
+
+  const idField = projectForm?.querySelector('[data-project-field="id"]');
+  if (idField) idField.disabled = true;
+
+  showModal(projectModal);
+}
+
+function closeProjectModal() {
+  hideModal(projectModal);
+  editingProjectId = null;
+  if (projectForm) projectForm.reset();
+}
+
+async function handleProjectSubmit(event) {
+  event.preventDefault();
+
+  const formData = {};
+  const fields = projectForm?.querySelectorAll("[data-project-field]");
+
+  fields?.forEach(field => {
+    const key = field.dataset.projectField;
+    let value = field.value.trim();
+    if (["start_year", "end_year"].includes(key) && value) value = parseInt(value, 10);
+    if (value !== "" && value !== null) formData[key] = value;
+  });
+
+  try {
+    let result;
+    if (editingProjectId) {
+      formData.id = editingProjectId;
+      const response = await fetch(PROJECTS_API, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+      result = await response.json();
+    } else {
+      const response = await fetch(PROJECTS_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+      result = await response.json();
+    }
+
+    if (result.success) {
+      closeProjectModal();
+      showNotice(editingProjectId ? "Project updated" : "Project created");
+      fetchProjects();
+    } else {
+      if (projectModalNotice) {
+        projectModalNotice.textContent = result.error || "Operation failed";
+        projectModalNotice.hidden = false;
+        projectModalNotice.style.color = "#c00";
+      }
+    }
+  } catch (error) {
+    if (projectModalNotice) {
+      projectModalNotice.textContent = `Error: ${error.message}`;
+      projectModalNotice.hidden = false;
+      projectModalNotice.style.color = "#c00";
+    }
+  }
+}
+
+function exportProjects() {
+  const data = getFilteredProjects();
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `projects_export_${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  showNotice("Projects exported");
+}
+
+// ============ PUBLISH TO RECORDS ============
+
+function openPublishModal(project) {
+  publishingProject = project;
+  if (publishProjectName) publishProjectName.textContent = project.name;
+  if (publishForm) publishForm.reset();
+  if (publishModalNotice) publishModalNotice.hidden = true;
+
+  // Pre-fill some fields
+  const titleField = publishForm?.querySelector('[data-publish-field="title"]');
+  if (titleField) titleField.value = project.name;
+
+  const yearField = publishForm?.querySelector('[data-publish-field="year"]');
+  if (yearField) yearField.value = new Date().getFullYear();
+
+  const statusField = publishForm?.querySelector('[data-publish-field="status"]');
+  if (statusField) statusField.value = project.status;
+
+  const projectField = publishForm?.querySelector('[data-publish-field="project"]');
+  if (projectField) projectField.value = project.id;
+
+  const contentField = publishForm?.querySelector('[data-publish-field="content"]');
+  if (contentField) contentField.value = project.description || "";
+
+  showModal(publishModal);
+}
+
+function closePublishModal() {
+  hideModal(publishModal);
+  publishingProject = null;
+  if (publishForm) publishForm.reset();
+}
+
+async function handlePublishSubmit(event) {
+  event.preventDefault();
+
+  const formData = {};
+  const fields = publishForm?.querySelectorAll("[data-publish-field]");
+
+  fields?.forEach(field => {
+    const key = field.dataset.publishField;
+    let value = field.value.trim();
+    if (key === "year" && value) value = parseInt(value, 10);
+    if (key === "project" && value) value = [value]; // Make it an array
+    if (value !== "" && value !== null) formData[key] = value;
+  });
+
+  try {
+    const response = await fetch(RECORDS_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData)
+    });
+    const result = await response.json();
+
+    if (result.success) {
+      closePublishModal();
+      showNotice(`Record ${formData.id} created from project`);
+      fetchRecords();
+    } else {
+      if (publishModalNotice) {
+        publishModalNotice.textContent = result.error || "Publish failed";
+        publishModalNotice.hidden = false;
+        publishModalNotice.style.color = "#c00";
+      }
+    }
+  } catch (error) {
+    if (publishModalNotice) {
+      publishModalNotice.textContent = `Error: ${error.message}`;
+      publishModalNotice.hidden = false;
+      publishModalNotice.style.color = "#c00";
+    }
+  }
+}
+
+// ============ DELETE ============
+
+function openDeleteModal(type, id) {
+  deleteTarget = { type, id };
+  if (deleteIdEl) deleteIdEl.textContent = id;
+  showModal(deleteModal);
+}
+
+function closeDeleteModal() {
+  hideModal(deleteModal);
+  deleteTarget = { type: null, id: null };
+}
+
+async function handleDelete() {
+  const { type, id } = deleteTarget;
+  if (!type || !id) return;
+
+  const apiUrl = type === "record" ? RECORDS_API : PROJECTS_API;
+
+  try {
+    const response = await fetch(`${apiUrl}?id=${encodeURIComponent(id)}`, {
+      method: "DELETE"
+    });
+    const result = await response.json();
+
+    if (result.success) {
+      closeDeleteModal();
+      showNotice(`${type === "record" ? "Record" : "Project"} deleted`);
+      if (type === "record") fetchRecords();
+      else fetchProjects();
+    } else {
+      showNotice(result.error || "Delete failed", true);
+      closeDeleteModal();
+    }
+  } catch (error) {
+    showNotice(`Error: ${error.message}`, true);
+    closeDeleteModal();
+  }
+}
+
+// ============ EVENT LISTENERS ============
+
 document.querySelectorAll("[data-action]").forEach(el => {
   const action = el.dataset.action;
-
   el.addEventListener("click", () => {
     switch (action) {
-      case "create":
-        openCreateModal();
-        break;
-      case "export":
-        exportRecords();
-        break;
-      case "refresh":
-        fetchRecords();
-        break;
-      case "close-modal":
-        closeModal();
-        break;
-      case "close-delete-modal":
-        closeDeleteModal();
-        break;
-      case "confirm-delete":
-        handleDelete();
-        break;
+      case "create-record": openCreateRecordModal(); break;
+      case "export-records": exportRecords(); break;
+      case "refresh-records": fetchRecords(); break;
+      case "close-record-modal": closeRecordModal(); break;
+      case "create-project": openCreateProjectModal(); break;
+      case "export-projects": exportProjects(); break;
+      case "refresh-projects": fetchProjects(); break;
+      case "close-project-modal": closeProjectModal(); break;
+      case "close-publish-modal": closePublishModal(); break;
+      case "close-delete-modal": closeDeleteModal(); break;
+      case "confirm-delete": handleDelete(); break;
     }
   });
 });
@@ -388,41 +683,49 @@ document.querySelectorAll("[data-action]").forEach(el => {
 // Filter listeners
 [divisionFilter, statusFilter, searchFilter].forEach(el => {
   if (el) {
-    el.addEventListener("input", renderTable);
-    el.addEventListener("change", renderTable);
+    el.addEventListener("input", renderRecordsTable);
+    el.addEventListener("change", renderRecordsTable);
   }
 });
 
-// Form submit
-if (recordForm) {
-  recordForm.addEventListener("submit", handleSubmit);
-}
+[projectStatusFilter, projectSearchFilter].forEach(el => {
+  if (el) {
+    el.addEventListener("input", renderProjectsTable);
+    el.addEventListener("change", renderProjectsTable);
+  }
+});
+
+// Form submits
+if (recordForm) recordForm.addEventListener("submit", handleRecordSubmit);
+if (projectForm) projectForm.addEventListener("submit", handleProjectSubmit);
+if (publishForm) publishForm.addEventListener("submit", handlePublishSubmit);
 
 // Close modals on overlay click
-modal?.addEventListener("click", (e) => {
-  if (e.target === modal) closeModal();
+[recordModal, projectModal, publishModal, deleteModal].forEach(modal => {
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      if (modal === recordModal) closeRecordModal();
+      else if (modal === projectModal) closeProjectModal();
+      else if (modal === publishModal) closePublishModal();
+      else if (modal === deleteModal) closeDeleteModal();
+    }
+  });
 });
 
-deleteModal?.addEventListener("click", (e) => {
-  if (e.target === deleteModal) closeDeleteModal();
-});
-
-// Close modals on Escape key
+// Close modals on Escape
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (!modal.hidden) closeModal();
-    if (!deleteModal.hidden) closeDeleteModal();
+    if (recordModal && !recordModal.hidden) closeRecordModal();
+    if (projectModal && !projectModal.hidden) closeProjectModal();
+    if (publishModal && !publishModal.hidden) closePublishModal();
+    if (deleteModal && !deleteModal.hidden) closeDeleteModal();
   }
 });
 
-// Initialize - ensure modals are hidden
-if (modal) {
-  modal.hidden = true;
-  modal.style.display = "none";
-}
-if (deleteModal) {
-  deleteModal.hidden = true;
-  deleteModal.style.display = "none";
-}
+// ============ INITIALIZE ============
 
+// Ensure all modals are hidden
+[recordModal, projectModal, publishModal, deleteModal].forEach(hideModal);
+
+// Load records
 fetchRecords();

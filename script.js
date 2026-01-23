@@ -822,29 +822,49 @@ function initPassphraseInput() {
     return;
   }
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const value = input.value.trim();
-    if (value === "agata") {
-      setClearance("witness");
-      noticeEl.textContent = "Recorded.";
+    if (!value) {
+      noticeEl.textContent = "No change.";
       noticeEl.hidden = false;
-      window.setTimeout(() => {
-        window.location.reload();
-      }, 700);
       return;
     }
-    if (value === "agata-internal-operator") {
-      setAdmin(true);
-      noticeEl.textContent = "Access state updated.";
+
+    try {
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passphrase: value })
+      });
+      const result = await response.json();
+
+      if (result.success && result.level === "admin") {
+        setAdmin(true);
+        noticeEl.textContent = "Access state updated.";
+        noticeEl.hidden = false;
+        window.setTimeout(() => {
+          window.location.reload();
+        }, 700);
+        return;
+      }
+
+      if (result.success && result.level === "witness") {
+        setClearance("witness");
+        noticeEl.textContent = "Recorded.";
+        noticeEl.hidden = false;
+        window.setTimeout(() => {
+          window.location.reload();
+        }, 700);
+        return;
+      }
+
+      noticeEl.textContent = "No change.";
       noticeEl.hidden = false;
-      window.setTimeout(() => {
-        window.location.reload();
-      }, 700);
-      return;
+    } catch (error) {
+      noticeEl.textContent = "No change.";
+      noticeEl.hidden = false;
     }
-    noticeEl.textContent = "No change.";
-    noticeEl.hidden = false;
   });
 }
 
