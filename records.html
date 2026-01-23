@@ -27,6 +27,19 @@
         <h1>Records Index</h1>
         <p>Registry of published and controlled records across all divisions.</p>
 
+        <div class="filter-row">
+          <label for="division-filter" class="filter-label">Filter by division</label>
+          <select id="division-filter" data-division-filter>
+            <option value="">All divisions</option>
+            <option value="broadcast">Broadcast</option>
+            <option value="works">Works</option>
+            <option value="research">Research</option>
+            <option value="narrative">Narrative</option>
+            <option value="exchange">Exchange</option>
+            <option value="access">Access</option>
+          </select>
+        </div>
+
         <table class="table">
           <thead>
             <tr>
@@ -46,7 +59,7 @@
       <footer>
         <!-- Footer metadata shared across pages. -->
         <div class="footer-grid">
-          <span>Gods Cruiseline Infomatics</span>
+          <span>Gods Cruiseline Informatics</span>
           <span>Cycle <span data-year>2026</span></span>
           <span>Records Ledger: GC-REC-01</span>
         </div>
