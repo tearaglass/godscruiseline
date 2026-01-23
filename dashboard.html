@@ -280,17 +280,18 @@
               <div class="form-grid">
                 <div>
                   <label for="modal-project-id">Project ID</label>
-                  <input id="modal-project-id" name="id" type="text" placeholder="project-slug" required data-project-field="id" />
+                  <input id="modal-project-id" name="id" type="text" placeholder="project-slug" data-project-field="id" />
                 </div>
 
                 <div>
                   <label for="modal-project-name">Name</label>
-                  <input id="modal-project-name" name="name" type="text" required data-project-field="name" />
+                  <input id="modal-project-name" name="name" type="text" data-project-field="name" />
                 </div>
 
                 <div>
                   <label for="modal-project-status">Status</label>
-                  <select id="modal-project-status" name="status" required data-project-field="status">
+                  <select id="modal-project-status" name="status" data-project-field="status">
+                    <option value="">—</option>
                     <option value="public">public</option>
                     <option value="registered">registered</option>
                     <option value="authorized">authorized</option>
@@ -311,6 +312,10 @@
                 <div>
                   <label for="modal-project-end-year">End Year</label>
                   <input id="modal-project-end-year" name="end_year" type="number" data-project-field="end_year" />
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="modal-project-ongoing" data-project-ongoing />
+                    Ongoing
+                  </label>
                 </div>
               </div>
 

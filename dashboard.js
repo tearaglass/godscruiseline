@@ -447,6 +447,13 @@ function openCreateProjectModal() {
   const idField = projectForm?.querySelector('[data-project-field="id"]');
   if (idField) idField.disabled = false;
   if (projectModalNotice) projectModalNotice.hidden = true;
+
+  // Reset ongoing checkbox and enable end year
+  const ongoingCheckbox = projectForm?.querySelector("[data-project-ongoing]");
+  const endYearField = projectForm?.querySelector('[data-project-field="end_year"]');
+  if (ongoingCheckbox) ongoingCheckbox.checked = false;
+  if (endYearField) endYearField.disabled = false;
+
   showModal(projectModal);
 }
 
@@ -460,7 +467,7 @@ function openEditProjectModal(project) {
     const key = field.dataset.projectField;
     let value = project[key] || project[key.replace(/_/g, "")]; // Handle snake_case vs camelCase
     if (field.tagName === "SELECT") {
-      field.value = value || field.options[0].value;
+      field.value = value || "";
     } else {
       field.value = value || "";
     }
@@ -468,6 +475,13 @@ function openEditProjectModal(project) {
 
   const idField = projectForm?.querySelector('[data-project-field="id"]');
   if (idField) idField.disabled = true;
+
+  // Set ongoing checkbox based on whether end_year exists
+  const ongoingCheckbox = projectForm?.querySelector("[data-project-ongoing]");
+  const endYearField = projectForm?.querySelector('[data-project-field="end_year"]');
+  const hasEndYear = project.end_year || project.endYear;
+  if (ongoingCheckbox) ongoingCheckbox.checked = !hasEndYear;
+  if (endYearField) endYearField.disabled = !hasEndYear;
 
   showModal(projectModal);
 }
@@ -695,6 +709,16 @@ document.querySelectorAll("[data-action]").forEach(el => {
     el.addEventListener("change", renderProjectsTable);
   }
 });
+
+// Ongoing checkbox toggles end year field
+const ongoingCheckbox = document.querySelector("[data-project-ongoing]");
+const endYearField = document.querySelector('[data-project-field="end_year"]');
+if (ongoingCheckbox && endYearField) {
+  ongoingCheckbox.addEventListener("change", () => {
+    endYearField.disabled = ongoingCheckbox.checked;
+    if (ongoingCheckbox.checked) endYearField.value = "";
+  });
+}
 
 // Form submits
 if (recordForm) recordForm.addEventListener("submit", handleRecordSubmit);
