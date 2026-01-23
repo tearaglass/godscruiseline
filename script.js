@@ -758,24 +758,6 @@ function applyClearanceUI() {
     }
   }
 
-  const internalToolsSection = document.querySelector('section[aria-label="Internal tools"]');
-  if (internalToolsSection) {
-    const internalLinks = internalToolsSection.querySelectorAll('a[href="file-record.html"], a[href="register-project.html"]');
-    const showTools = isAdmin() || clearanceRank >= getClearanceRank("authorized");
-    internalLinks.forEach((link) => {
-      link.hidden = !showTools;
-    });
-    const separator = internalToolsSection.querySelector('span[aria-hidden="true"]');
-    if (separator) {
-      separator.hidden = !showTools;
-    }
-    const metaRows = internalToolsSection.querySelectorAll(".meta");
-    metaRows.forEach((row) => {
-      if (row.querySelector('a[href="file-record.html"]') || row.querySelector('a[href="register-project.html"]')) {
-        row.hidden = !showTools;
-      }
-    });
-  }
 }
 
 function initPassphraseInput() {
@@ -1010,13 +992,10 @@ async function init() {
   renderRelatedRecords();
   renderProjectsIndex();
   renderProjectDetail();
-  initRecordForm();
-  initProjectForm();
   initAnnotations();
   initDivisionFilter();
   applyClearanceUI();
   initPassphraseInput();
-  initRestrictedForms();
 }
 
 init();
