@@ -227,7 +227,8 @@ button:hover {
   align-items: center;
 }
 
-.hidden {
+.hidden,
+[hidden] {
   display: none !important;
 }
 
