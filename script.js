@@ -46,6 +46,11 @@ const DECAY_NOTICE = "This record is no longer available.";
 const CLEARANCE_LEVELS = ["public", "registered", "witness", "authorized", "restricted"];
 const CLEARANCE_STORAGE_KEY = "gc_clearance";
 const ADMIN_STORAGE_KEY = "gc_admin";
+const AUTH_STATES = {
+  loading: "loading",
+  unauthenticated: "unauthenticated",
+  authenticated: "authenticated"
+};
 
 function getClearance() {
   const stored = localStorage.getItem(CLEARANCE_STORAGE_KEY);
@@ -78,6 +83,73 @@ function setAdmin(value) {
 function getClearanceRank(level) {
   const index = CLEARANCE_LEVELS.indexOf(level);
   return index === -1 ? 0 : index;
+}
+
+function getAuthInfo() {
+  const clearance = getClearance();
+  const clearanceRank = getClearanceRank(clearance);
+  const admin = isAdmin();
+  const authenticated = admin || clearanceRank >= getClearanceRank("witness");
+  return { clearance, clearanceRank, admin, authenticated };
+}
+
+function formatClearance(level) {
+  if (!level) {
+    return "";
+  }
+  return level.charAt(0).toUpperCase() + level.slice(1);
+}
+
+function formatAuthMeta(authInfo) {
+  if (!authInfo) {
+    return "";
+  }
+  if (authInfo.admin) {
+    if (authInfo.clearance && authInfo.clearance !== "public") {
+      return `Role: Administrator · Clearance: ${formatClearance(authInfo.clearance)}`;
+    }
+    return "Role: Administrator";
+  }
+  if (authInfo.clearance) {
+    return `Clearance: ${formatClearance(authInfo.clearance)}`;
+  }
+  return "";
+}
+
+function applyAuthView(state, authInfo) {
+  const viewEls = document.querySelectorAll("[data-auth-view]");
+  viewEls.forEach((el) => {
+    el.hidden = el.dataset.authView !== state;
+  });
+
+  const metaEl = document.querySelector("[data-auth-meta]");
+  if (metaEl) {
+    if (state !== AUTH_STATES.authenticated) {
+      metaEl.textContent = "";
+      metaEl.hidden = true;
+      return;
+    }
+    const meta = formatAuthMeta(authInfo);
+    metaEl.textContent = meta;
+    metaEl.hidden = !meta;
+  }
+}
+
+function guardProjectsRoutes(authInfo) {
+  const path = window.location.pathname;
+  const isProjectsRoute =
+    path.endsWith("/projects.html") ||
+    path.endsWith("projects.html") ||
+    path.endsWith("/project.html") ||
+    path.endsWith("project.html");
+  if (!isProjectsRoute) {
+    return true;
+  }
+  if (authInfo.authenticated) {
+    return true;
+  }
+  window.location.replace("system.html");
+  return false;
 }
 
 function getRestrictedNotice() {
@@ -693,39 +765,6 @@ function applyClearanceUI() {
   }
   const clearance = getClearance();
   const clearanceRank = getClearanceRank(clearance);
-  const navLinks = document.querySelectorAll('nav ul li a[href]');
-  navLinks.forEach((link) => {
-    const href = link.getAttribute("href");
-    if (!href) {
-      return;
-    }
-    const listItem = link.closest("li");
-    if (!listItem) {
-      return;
-    }
-    if (clearance === "public") {
-      listItem.hidden = !(href === "system.html" || href === "records.html");
-      return;
-    }
-    if (href === "dashboard.html") {
-      listItem.hidden = !isAdmin();
-      return;
-    }
-    listItem.hidden = false;
-  });
-
-  // Add dashboard link to nav for admins if not already present
-  if (isAdmin()) {
-    const navUl = document.querySelector("nav ul");
-    if (navUl && !navUl.querySelector('a[href="dashboard.html"]')) {
-      const dashboardLi = document.createElement("li");
-      const dashboardLink = document.createElement("a");
-      dashboardLink.href = "dashboard.html";
-      dashboardLink.textContent = "Dashboard";
-      dashboardLi.appendChild(dashboardLink);
-      navUl.appendChild(dashboardLi);
-    }
-  }
 
   const annotationsSection = document.querySelector("[data-annotations]");
   if (annotationsSection) {
@@ -744,24 +783,15 @@ function applyClearanceUI() {
     }
   });
 
-  if (window.location.pathname.endsWith("/access.html") || window.location.pathname.endsWith("access.html")) {
-    const accessFooter = document.querySelector(".footer-grid");
-    if (accessFooter && clearance === "witness") {
-      const clearanceEl = document.createElement("span");
-      clearanceEl.dataset.clearanceIndicator = "true";
-      clearanceEl.textContent = "Clearance: Witness";
-      accessFooter.appendChild(clearanceEl);
-    }
-  }
-
 }
 
 function initPassphraseInput() {
-  const form = document.querySelector('form.form[aria-label="Passphrase input"]');
+  const form = document.querySelector("[data-access-form]");
   if (!form) {
     return;
   }
   const input = form.querySelector("#passphrase-input");
+  const identifier = form.querySelector("#access-identifier");
   const noticeEl = form.querySelector("[data-passphrase-notice]");
   if (!input || !noticeEl) {
     return;
@@ -780,7 +810,7 @@ function initPassphraseInput() {
       const response = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passphrase: value })
+        body: JSON.stringify({ passphrase: value, identifier: identifier?.value?.trim() })
       });
       const result = await response.json();
 
@@ -973,10 +1003,18 @@ async function fetchProjectsData() {
 
 // Initialize the application
 async function init() {
+  applyAuthView(AUTH_STATES.loading);
+  const authInfo = getAuthInfo();
+  if (!guardProjectsRoutes(authInfo)) {
+    return;
+  }
+
   // Fetch data from API (with static fallback)
+  const recordsDataPromise = fetchRecordsData();
+  const projectsDataPromise = authInfo.authenticated ? fetchProjectsData() : Promise.resolve([]);
   const [recordsData, projectsData] = await Promise.all([
-    fetchRecordsData(),
-    fetchProjectsData()
+    recordsDataPromise,
+    projectsDataPromise
   ]);
 
   records = recordsData;
@@ -986,12 +1024,18 @@ async function init() {
   renderRecordsTable();
   renderRecordDetail();
   renderRelatedRecords();
-  renderProjectsIndex();
-  renderProjectDetail();
+  if (authInfo.authenticated) {
+    renderProjectsIndex();
+    renderProjectDetail();
+  }
   initAnnotations();
   initDivisionFilter();
   applyClearanceUI();
   initPassphraseInput();
+  applyAuthView(
+    authInfo.authenticated ? AUTH_STATES.authenticated : AUTH_STATES.unauthenticated,
+    authInfo
+  );
 }
 
 init();
