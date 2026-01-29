@@ -791,7 +791,6 @@ function initPassphraseInput() {
     return;
   }
   const input = form.querySelector("#passphrase-input");
-  const identifier = form.querySelector("#access-identifier");
   const noticeEl = form.querySelector("[data-passphrase-notice]");
   if (!input || !noticeEl) {
     return;
@@ -810,7 +809,7 @@ function initPassphraseInput() {
       const response = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passphrase: value, identifier: identifier?.value?.trim() })
+        body: JSON.stringify({ passphrase: value })
       });
       const result = await response.json();
 
