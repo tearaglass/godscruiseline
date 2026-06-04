@@ -184,19 +184,28 @@ footer {
 .terminal-id {
   border: 0;
   padding: 0;
-  color: var(--muted);
+  color: #4d5f72;
   background: transparent;
   font: inherit;
   text-align: inherit;
-  text-shadow: 0 0 7px rgba(213, 232, 255, 0.28);
+  text-shadow:
+    0 0 1px rgba(247, 251, 255, 0.95),
+    0 0 6px rgba(142, 184, 226, 0.6),
+    0 0 14px rgba(142, 184, 226, 0.28);
+  transition:
+    color 160ms ease,
+    text-shadow 160ms ease;
   cursor: pointer;
 }
 
 .terminal-id:hover,
 .terminal-id:focus-visible {
   background: transparent;
-  color: var(--text);
-  text-shadow: 0 0 10px rgba(213, 232, 255, 0.5);
+  color: #2f465f;
+  text-shadow:
+    0 0 1px rgba(247, 251, 255, 1),
+    0 0 8px rgba(142, 184, 226, 0.82),
+    0 0 18px rgba(142, 184, 226, 0.42);
 }
 
 .terminal-id:focus-visible {
@@ -330,6 +339,17 @@ button {
 
 button:hover {
   background: var(--bg);
+}
+
+.registry-reveal .terminal-id {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.registry-reveal .terminal-id:hover,
+.registry-reveal .terminal-id:focus-visible {
+  background: transparent;
 }
 
 .form-actions {
