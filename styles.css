@@ -175,6 +175,117 @@ footer {
   justify-content: space-between;
 }
 
+.registry-reveal {
+  position: relative;
+  display: inline-flex;
+  justify-content: flex-end;
+}
+
+.terminal-id {
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  font: inherit;
+  text-align: inherit;
+  text-shadow: 0 0 7px rgba(213, 232, 255, 0.28);
+  cursor: pointer;
+}
+
+.terminal-id:hover,
+.terminal-id:focus-visible {
+  background: transparent;
+  color: var(--text);
+  text-shadow: 0 0 10px rgba(213, 232, 255, 0.5);
+}
+
+.terminal-id:focus-visible {
+  outline: 1px solid var(--line);
+  outline-offset: 3px;
+}
+
+.registry-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 10;
+  width: min(260px, calc(100vw - 40px));
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 8px 18px rgba(27, 27, 27, 0.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: left;
+  letter-spacing: 0;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.registry-panel.is-open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.registry-heading,
+.registry-status,
+.registry-pending {
+  display: block;
+}
+
+.registry-heading {
+  font-weight: 600;
+}
+
+.registry-status,
+.registry-pending {
+  color: var(--muted);
+}
+
+.registry-divider {
+  display: block;
+  width: 100%;
+  height: 1px;
+  margin: 8px 0;
+  background: var(--line);
+}
+
+.registry-panel a {
+  display: block;
+  margin: 8px 0;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.registry-panel a span {
+  display: block;
+}
+
+.registry-panel a span + span {
+  color: var(--muted);
+  padding-left: 18px;
+}
+
+.registry-panel a:hover,
+.registry-panel a:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 520px) {
+  .registry-panel {
+    left: 0;
+    right: auto;
+  }
+}
+
 .form {
   max-width: 720px;
   margin-top: 16px;

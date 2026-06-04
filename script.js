@@ -785,6 +785,94 @@ function applyClearanceUI() {
 
 }
 
+function initRegistryReveal() {
+  const toggles = document.querySelectorAll("[data-registry-toggle]");
+  let active = null;
+  let closeTimer = null;
+
+  const clearCloseTimer = () => {
+    if (closeTimer) {
+      window.clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    clearCloseTimer();
+    closeTimer = window.setTimeout(() => {
+      closeActive();
+    }, 10000);
+  };
+
+  function closeActive() {
+    if (!active) {
+      return;
+    }
+
+    const { toggle, panel } = active;
+    clearCloseTimer();
+    panel.classList.remove("is-open");
+    toggle.setAttribute("aria-expanded", "false");
+    window.setTimeout(() => {
+      if (!panel.classList.contains("is-open")) {
+        panel.hidden = true;
+      }
+    }, 180);
+    active = null;
+  }
+
+  const openPanel = (toggle, panel) => {
+    closeActive();
+    panel.hidden = false;
+    window.requestAnimationFrame(() => {
+      panel.classList.add("is-open");
+    });
+    toggle.setAttribute("aria-expanded", "true");
+    active = { toggle, panel };
+    scheduleClose();
+  };
+
+  toggles.forEach((toggle) => {
+    const panelId = toggle.getAttribute("aria-controls");
+    const panel = panelId ? document.getElementById(panelId) : null;
+    if (!panel) {
+      return;
+    }
+
+    toggle.addEventListener("click", () => {
+      const isOpen = active?.toggle === toggle;
+      if (isOpen) {
+        closeActive();
+        return;
+      }
+      openPanel(toggle, panel);
+    });
+
+    panel.addEventListener("pointermove", scheduleClose);
+    panel.addEventListener("focusin", scheduleClose);
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!active) {
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof Node)) {
+      return;
+    }
+    if (active.toggle.contains(target) || active.panel.contains(target)) {
+      return;
+    }
+    closeActive();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeActive();
+    }
+  });
+}
+
 function initPassphraseInput() {
   const form = document.querySelector("[data-access-form]");
   if (!form) {
@@ -1030,6 +1118,7 @@ async function init() {
   initAnnotations();
   initDivisionFilter();
   applyClearanceUI();
+  initRegistryReveal();
   initPassphraseInput();
   applyAuthView(
     authInfo.authenticated ? AUTH_STATES.authenticated : AUTH_STATES.unauthenticated,

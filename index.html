@@ -37,7 +37,39 @@
         <div class="footer-grid">
           <span>Gods Cruiseline Informatics</span>
           <span>Cycle <span data-year>2026</span></span>
-          <span>Terminal ID: GC-TERM-01</span>
+          <span class="registry-reveal">
+            <button
+              class="terminal-id"
+              type="button"
+              aria-expanded="false"
+              aria-controls="terminal-registry-panel"
+              data-registry-toggle
+            >
+              Terminal ID: GC-TERM-01
+            </button>
+            <span
+              class="registry-panel"
+              id="terminal-registry-panel"
+              role="region"
+              aria-label="Terminal registry record"
+              data-registry-panel
+              hidden
+            >
+              <span class="registry-heading">RECORD 01-A</span>
+              <span class="registry-status">STATUS: PUBLIC</span>
+              <span class="registry-divider" aria-hidden="true"></span>
+              <a href="https://www.youtube.com/@godscruiseline">
+                <span>[01] Broadcast Archive</span>
+                <span>-> YouTube</span>
+              </a>
+              <a href="https://github.com/tearaglass/godscruiseline">
+                <span>[02] Source Registry</span>
+                <span>-> GitHub</span>
+              </a>
+              <span class="registry-pending">[03] Audio Records</span>
+              <span class="registry-pending">[04] Correspondence</span>
+            </span>
+          </span>
         </div>
       </footer>
     </div>
