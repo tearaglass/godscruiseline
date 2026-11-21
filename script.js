@@ -326,7 +326,9 @@ function renderRecordDetail() {
     fieldEl.textContent = fieldValues[key] || "";
   });
 
-  const archivalState = record.archival?.state || "active";
+  const archivalState = record.archival_state === "decayed" || record.archival?.state === "decayed"
+    ? "decayed"
+    : (record.archival_state || record.archival?.state || "active");
   if (archivalState === "archived") {
     archivalTermEl.textContent = "Archival";
     archivalNoteEl.textContent = ARCHIVED_NOTICE;
@@ -345,15 +347,12 @@ function renderRecordDetail() {
     return;
   }
 
-  const isCharterRecord = record.id === "GC-R-000";
-  const hasCharterContent = isCharterRecord && record.content;
-
-  if (hasCharterContent) {
+  if (record.status === "public") {
     statusEl.textContent = "";
-    contentEl.textContent = record.content;
-  } else if (record.status === "public") {
-    statusEl.textContent = "";
-    contentEl.textContent = PUBLIC_PLACEHOLDER;
+    const body = typeof record.content === "string" && record.content.trim()
+      ? record.content
+      : PUBLIC_PLACEHOLDER;
+    contentEl.textContent = body;
   } else {
     statusEl.textContent = getRestrictedNotice();
     contentEl.textContent = "";
