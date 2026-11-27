@@ -1,36 +1,67 @@
-module.exports = function handler(req, res) {
-  // Handle CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+const {
+  handlePreflight,
+  serverError,
+  createSessionCookie,
+  clearSessionCookie,
+  getSession,
+  safeEqual
+} = require('./_lib');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+// Slows down repeated guessing. Not a full rate limit.
+const FAILED_ATTEMPT_DELAY_MS = 600;
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+module.exports = async function handler(req, res) {
+  if (handlePreflight(req, res)) {
+    return;
   }
 
+  // GET reports the current server-verified session level (or null).
   if (req.method === 'GET') {
-    return res.status(200).json({ success: true, message: 'Auth API ready. Use POST to validate.' });
+    const session = getSession(req);
+    return res.status(200).json({ success: true, level: session ? session.level : null });
+  }
+
+  // DELETE ends the session.
+  if (req.method === 'DELETE') {
+    res.setHeader('Set-Cookie', clearSessionCookie());
+    return res.status(200).json({ success: true });
   }
 
   if (req.method === 'POST') {
     const { passphrase } = req.body || {};
+    const value = typeof passphrase === 'string' ? passphrase.trim() : '';
 
-    if (!passphrase || !passphrase.trim()) {
+    if (!value) {
       return res.status(400).json({ success: false, error: 'Passphrase required' });
     }
 
     const witnessPassphrase = process.env.WITNESS_PASSPHRASE || '';
     const adminPassphrase = process.env.ADMIN_PASSPHRASE || '';
 
-    if (adminPassphrase && passphrase.trim() === adminPassphrase) {
-      return res.status(200).json({ success: true, level: 'admin' });
+    let level = null;
+    if (adminPassphrase && safeEqual(value, adminPassphrase)) {
+      level = 'admin';
+    } else if (witnessPassphrase && safeEqual(value, witnessPassphrase)) {
+      level = 'witness';
     }
 
-    if (witnessPassphrase && passphrase.trim() === witnessPassphrase) {
-      return res.status(200).json({ success: true, level: 'witness' });
+    if (!level) {
+      await wait(FAILED_ATTEMPT_DELAY_MS);
+      return res.status(401).json({ success: false, level: null });
     }
 
-    return res.status(200).json({ success: true, level: null });
+    try {
+      // The signed HttpOnly cookie is what the other APIs check.
+      res.setHeader('Set-Cookie', createSessionCookie(level));
+    } catch (error) {
+      // SESSION_SECRET missing: fail closed rather than grant an unverifiable level.
+      return serverError(res, error);
+    }
+    return res.status(200).json({ success: true, level });
   }
 
   return res.status(405).json({ success: false, error: 'Method not allowed' });

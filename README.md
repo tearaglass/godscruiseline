@@ -27,8 +27,10 @@ Access is gated by a clearance hierarchy stored in localStorage. Higher clearanc
 ### Clearance Upgrades
 
 - **Public → Registered**: Automatically granted after reading the System Charter (GC-R-000) for 20 seconds
-- **Registered → Witness**: Enter passphrase `agata` on the Access page
-- **Admin mode**: Enter passphrase `agata-internal-operator` on the Access page
+- **Registered → Witness**: Enter the witness passphrase (`WITNESS_PASSPHRASE` env var) on the System page
+- **Admin mode**: Enter the admin passphrase (`ADMIN_PASSPHRASE` env var) on the System page
+
+Passphrases are never stored in this repo. A correct passphrase sets a signed, HttpOnly `gc_session` cookie (8 hours). The API checks that cookie; the localStorage keys below only drive the UI.
 
 ## Data Structure
 
@@ -115,6 +117,22 @@ python -m http.server 8000
 ## Deployment
 
 Deployed via GitHub Pages. The `CNAME` file points to `www.godscruiseline.com`.
+
+The API (`api/`) runs on Vercel and needs these environment variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_KEY` | Supabase service-role key (server only) |
+| `WITNESS_PASSPHRASE` | Passphrase for witness clearance |
+| `ADMIN_PASSPHRASE` | Passphrase for admin / dashboard |
+| `SESSION_SECRET` | Long random string used to sign the session cookie. Login fails closed if unset. |
+
+API access rules:
+
+- `GET /api/records`, `GET /api/projects`: public rows only, or all rows with an admin session
+- `POST`, `PUT`, `DELETE`: admin session required (401 otherwise)
+- `GET /api/auth`: current session level; `POST`: log in; `DELETE`: log out
 
 ## localStorage Keys
 

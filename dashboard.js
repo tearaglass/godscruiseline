@@ -11,9 +11,38 @@ function isAdmin() {
   return localStorage.getItem(ADMIN_STORAGE_KEY) === "true";
 }
 
+// Send the user back to the login form and forget the local admin flag.
+function endAdminSession() {
+  localStorage.removeItem(ADMIN_STORAGE_KEY);
+  window.location.href = "system.html";
+}
+
 // Redirect non-admins
 if (!isAdmin()) {
-  window.location.href = "access.html";
+  window.location.href = "system.html";
+}
+
+// The localStorage flag only controls the UI. The server session cookie is
+// what the API checks, so confirm it is still valid.
+async function verifyAdminSession() {
+  try {
+    const response = await fetch("/api/auth", { credentials: "same-origin" });
+    const result = await response.json();
+    if (result.level !== "admin") {
+      endAdminSession();
+    }
+  } catch (error) {
+    // API unreachable: leave the page as is; writes will fail on their own.
+  }
+}
+
+// Wraps fetch for write calls so an expired session returns to login.
+async function apiFetch(url, options) {
+  const response = await fetch(url, { credentials: "same-origin", ...options });
+  if (response.status === 401) {
+    endAdminSession();
+  }
+  return response;
 }
 
 // State
@@ -281,14 +310,14 @@ async function handleRecordSubmit(event) {
     let result;
     if (editingRecordId) {
       formData.id = editingRecordId;
-      const response = await fetch(RECORDS_API, {
+      const response = await apiFetch(RECORDS_API, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
       result = await response.json();
     } else {
-      const response = await fetch(RECORDS_API, {
+      const response = await apiFetch(RECORDS_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
@@ -339,7 +368,7 @@ async function fetchProjects() {
     if (projectsEmpty) projectsEmpty.hidden = true;
     if (projectsBody) projectsBody.textContent = "";
 
-    const response = await fetch(PROJECTS_API);
+    const response = await apiFetch(PROJECTS_API);
     const result = await response.json();
 
     if (result.success) {
@@ -509,14 +538,14 @@ async function handleProjectSubmit(event) {
     let result;
     if (editingProjectId) {
       formData.id = editingProjectId;
-      const response = await fetch(PROJECTS_API, {
+      const response = await apiFetch(PROJECTS_API, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
       result = await response.json();
     } else {
-      const response = await fetch(PROJECTS_API, {
+      const response = await apiFetch(PROJECTS_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
@@ -607,7 +636,7 @@ async function handlePublishSubmit(event) {
   });
 
   try {
-    const response = await fetch(RECORDS_API, {
+    const response = await apiFetch(RECORDS_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formData)
@@ -654,7 +683,7 @@ async function handleDelete() {
   const apiUrl = type === "record" ? RECORDS_API : PROJECTS_API;
 
   try {
-    const response = await fetch(`${apiUrl}?id=${encodeURIComponent(id)}`, {
+    const response = await apiFetch(`${apiUrl}?id=${encodeURIComponent(id)}`, {
       method: "DELETE"
     });
     const result = await response.json();
@@ -752,5 +781,6 @@ document.addEventListener("keydown", (e) => {
 // Ensure all modals are hidden
 [recordModal, projectModal, publishModal, deleteModal].forEach(hideModal);
 
-// Load records
+// Confirm the server session, then load records
+verifyAdminSession();
 fetchRecords();

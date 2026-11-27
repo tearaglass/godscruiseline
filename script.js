@@ -1087,9 +1087,31 @@ async function fetchProjectsData() {
   return staticProjects;
 }
 
+// localStorage only drives the UI. If it claims a level the server session
+// does not confirm (expired or never issued), reset it to public.
+async function syncWithServerSession() {
+  const local = getAuthInfo();
+  if (!local.authenticated) {
+    return;
+  }
+  try {
+    const response = await fetch("/api/auth", { credentials: "same-origin" });
+    const result = await response.json();
+    if (result.level !== "admin") {
+      setAdmin(false);
+    }
+    if (result.level !== "admin" && result.level !== "witness") {
+      setClearance("public");
+    }
+  } catch (error) {
+    // API unreachable (e.g. static-only host): leave local state alone.
+  }
+}
+
 // Initialize the application
 async function init() {
   applyAuthView(AUTH_STATES.loading);
+  await syncWithServerSession();
   const authInfo = getAuthInfo();
   if (!guardProjectsRoutes(authInfo)) {
     return;
