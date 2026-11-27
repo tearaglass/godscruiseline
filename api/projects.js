@@ -1,22 +1,41 @@
-const { createClient } = require('@supabase/supabase-js');
+const {
+  getSupabase,
+  handlePreflight,
+  serverError,
+  isAdminRequest,
+  pickFields,
+  checkEnums
+} = require('./_lib');
 
-function getSupabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY;
-  if (!url || !key) {
-    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set');
+// Columns clients are allowed to write. Anything else in the body is ignored.
+const PROJECT_FIELDS = ['id', 'name', 'description', 'status', 'lead', 'scope', 'start_year', 'end_year'];
+const REQUIRED = ['id', 'name', 'status'];
+
+function validate(data, { requireAll }) {
+  if (requireAll) {
+    const missing = REQUIRED.filter((field) => !data[field]);
+    if (missing.length > 0) {
+      return `Missing required fields: ${missing.join(', ')}`;
+    }
   }
-  return createClient(url, key);
+  for (const field of ['start_year', 'end_year']) {
+    if (data[field] !== undefined && data[field] !== null && !Number.isInteger(data[field])) {
+      return `Invalid ${field}`;
+    }
+  }
+  return checkEnums(data);
 }
 
 module.exports = async function handler(req, res) {
-  // Handle CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (handlePreflight(req, res)) {
+    return;
+  }
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+  const admin = isAdminRequest(req);
+
+  // Every method except GET changes data and requires an admin session.
+  if (req.method !== 'GET' && !admin) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
 
   try {
@@ -24,38 +43,34 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'GET') {
       const { id } = req.query;
+      let query = supabase.from('projects').select('*');
+      // Visitors without an admin session only receive public projects.
+      if (!admin) {
+        query = query.eq('status', 'public');
+      }
 
       if (id) {
-        const { data, error } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('id', id)
-          .single();
-
-        if (error) {
+        const { data, error } = await query.eq('id', id).maybeSingle();
+        if (error) throw error;
+        if (!data) {
           return res.status(404).json({ success: false, error: 'Project not found' });
         }
         return res.status(200).json({ success: true, data });
-      } else {
-        const { data, error } = await supabase
-          .from('projects')
-          .select('*')
-          .order('id');
-
-        if (error) throw error;
-        return res.status(200).json({ success: true, data });
       }
+
+      const { data, error } = await query.order('id');
+      if (error) throw error;
+      return res.status(200).json({ success: true, data });
     }
 
     if (req.method === 'POST') {
-      const body = req.body;
+      const project = pickFields(req.body, PROJECT_FIELDS);
+      const invalid = validate(project, { requireAll: true });
+      if (invalid) {
+        return res.status(400).json({ success: false, error: invalid });
+      }
 
-      const { data, error } = await supabase
-        .from('projects')
-        .insert(body)
-        .select()
-        .single();
-
+      const { data, error } = await supabase.from('projects').insert(project).select().single();
       if (error) {
         if (error.code === '23505') {
           return res.status(409).json({ success: false, error: 'Project with this ID already exists' });
@@ -66,20 +81,24 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'PUT') {
-      const body = req.body;
-      const projectId = body.id;
-
+      const changes = pickFields(req.body, PROJECT_FIELDS);
+      const projectId = changes.id;
       if (!projectId) {
         return res.status(400).json({ success: false, error: 'Project ID is required' });
+      }
+      delete changes.id;
+
+      const invalid = validate(changes, { requireAll: false });
+      if (invalid) {
+        return res.status(400).json({ success: false, error: invalid });
       }
 
       const { data, error } = await supabase
         .from('projects')
-        .update(body)
+        .update(changes)
         .eq('id', projectId)
         .select()
-        .single();
-
+        .maybeSingle();
       if (error) throw error;
       if (!data) {
         return res.status(404).json({ success: false, error: 'Project not found' });
@@ -89,7 +108,6 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'DELETE') {
       const { id } = req.query;
-
       if (!id) {
         return res.status(400).json({ success: false, error: 'Project ID is required' });
       }
@@ -99,8 +117,7 @@ module.exports = async function handler(req, res) {
         .delete()
         .eq('id', id)
         .select()
-        .single();
-
+        .maybeSingle();
       if (error) throw error;
       if (!data) {
         return res.status(404).json({ success: false, error: 'Project not found' });
@@ -109,8 +126,7 @@ module.exports = async function handler(req, res) {
     }
 
     return res.status(405).json({ success: false, error: 'Method not allowed' });
-
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    return serverError(res, error);
   }
-}
+};
