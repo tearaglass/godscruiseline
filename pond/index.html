@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pond Correspondence · God's Cruise Line</title>
+<style>
+:root{color-scheme:dark;--ink:#e6e1fb;--muted:#a49abb;--edge:#51476d;--pink:#ffa8da;--mint:#a9f4d4;background:#100f20;color:var(--ink);font:12px ui-monospace,monospace}*{box-sizing:border-box}body{margin:0}header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;border-bottom:1px solid var(--edge);background:#1c1930}h1{font-size:17px;margin:3px 0;letter-spacing:-.6px;font-weight:normal}small,.sub{color:var(--muted);font-size:10px}button{font:inherit;background:#302946;border:1px solid #78668d;color:var(--ink);padding:9px 11px;cursor:pointer;border-radius:5px}button:hover{background:#534168}button:focus-visible{outline:2px solid var(--mint)}button:disabled{opacity:.45;cursor:default}.status{color:var(--mint);text-align:right}.layout{display:grid;grid-template-columns:minmax(0,1fr) 235px;min-height:440px;height:calc(100dvh - 78px)}.viewport{position:relative;min-height:360px;overflow:hidden}canvas{width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}.hud{position:absolute;left:13px;top:13px;pointer-events:none;background:#17132ac9;padding:12px;border:1px solid #65557d;border-radius:8px;line-height:1.8}.hud strong{font-size:18px;color:var(--pink)}aside{background:#1c1930;border-left:1px solid var(--edge);padding:14px;overflow:auto}.panel{border-bottom:1px solid var(--edge);padding:12px 0}.panel:first-child{padding-top:0}.label{font-size:10px;color:var(--muted);letter-spacing:1px;margin:0 0 9px}.roles{display:flex;gap:6px}.roles button{flex:1}.flower{color:var(--pink)}.fish{color:var(--mint)}.bar{height:6px;border-radius:8px;background:#423751;margin:7px 0 10px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#ab91ff,#f9a9d8,#aaf5cf)}#log{line-height:1.5;font-size:11px;color:#d4c6df;min-height:65px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:6px}.hint{line-height:1.6;color:var(--muted);margin:8px 0 0;font-size:11px}#share{width:100%;margin-top:8px}#roletext{line-height:1.6}#toast{position:absolute;bottom:15px;left:50%;transform:translateX(-50%);background:#302946e8;border:1px solid #a28fc0;border-radius:20px;padding:10px 15px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s}.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;margin-top:8px}@media(max-width:650px){.layout{grid-template-columns:1fr;height:auto}.viewport{height:55dvh;min-height:320px}aside{border-left:0;border-top:1px solid var(--edge);display:grid;grid-template-columns:1fr 1fr;gap:12px}.panel{padding:0 0 10px}header{padding:10px}h1{font-size:15px}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+</head>
+<body>
+<header><div><small>GOD'S CRUISE LINE / AQUATIC RESEARCH DIVISION</small><h1>✿ Pond Correspondence</h1><div class="sub">A shared habitat for two organisms</div></div><div class="status" id="status">○ CHOOSE A SPECIMEN</div></header>
+<div class="layout"><div class="viewport"><canvas id="pond" aria-label="Interactive pond"></canvas><div class="hud">HABITAT <span id="roomname"></span><br><strong id="score">00</strong> <small>SYMBIOSES</small><br><span id="season">DUSK CULTURE</span><div class="legend"><span class="flower">● Flora</span><span class="fish">● Fauna</span></div></div><div id="toast"></div></div>
+<aside>
+<section class="panel"><div class="label">SPECIMEN ASSIGNMENT</div><div class="roles"><button id="host" class="flower">✿ Flora</button><button id="guest" class="fish">◉ Fauna</button></div><button id="share">Copy room link ↗</button><p class="hint">Share this room. One player selects each organism. Open the same link in Notion using /embed.</p></section>
+<section class="panel"><div class="label">CULTURE TELEMETRY</div><div id="roletext">Awaiting inoculation...</div><div class="bar"><i id="health" style="width:0"></i></div><div id="telemetry"></div></section>
+<section class="panel"><div class="label">MICROSCOPIC ACTIONS</div><div class="controls"><button id="act" disabled>✿ Cultivate</button><button id="heart" disabled>♡ Signal</button></div><p id="help" class="hint">Move by clicking or dragging inside the pond.</p></section>
+<section class="panel"><div class="label">CORRESPONDENCE LOG</div><div id="log">· The pond is waiting.</div></section>
+</aside></div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id),canvas=$('pond'),ctx=canvas.getContext('2d');
+const roomPattern=/^[a-f0-9]{24}$/;
+let room=location.hash.slice(1);
+if(!roomPattern.test(room)){room=Array.from(crypto.getRandomValues(new Uint8Array(12)),x=>x.toString(16).padStart(2,'0')).join('');location.hash=room}
+$('roomname').textContent=room.slice(0,6).toUpperCase();
+const key='pond-history-v1:'+room,colors=['#ffa8da','#abf5d8'],names=['Flora','Fauna'];
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const gap=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const rnd=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
+const point=(x,y)=>({x,y});
+const fresh=()=>({rev:0,score:0,seeds:[],blooms:[],notes:['A new habitat has formed.'],players:[point(.3,.5),point(.7,.5)],carry:false});
+let state=fresh();try{const saved=JSON.parse(localStorage.getItem(key));if(saved&&Number.isFinite(saved.rev)&&Array.isArray(saved.blooms)&&Array.isArray(saved.seeds)&&Array.isArray(saved.notes)&&saved.players?.length===2)state=saved}catch{}
+let role=-1,peer=null,conn=null,connected=false,ready=false,target=null,lastSend=0,toastTimer,signal=[0,0],w=1,h=1,time=0;
+const display=state.players.map(p=>({...p})),trails=[[],[]];
+const persist=()=>{try{localStorage.setItem(key,JSON.stringify(state))}catch{}};
+const log=s=>{state.notes.unshift(s);state.notes=state.notes.slice(0,7)};
+function send(data){if(conn?.open)conn.send(data)}
+function publish(){state.rev++;persist();send({type:'state',state});updateUI()}
+function flash(s){$('toast').textContent=s;$('toast').style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').style.opacity=0,2200)}
+function updateUI(){
+ $('score').textContent=String(state.score).padStart(2,'0');
+ $('health').style.width=Math.min(100,10+state.score*9+state.seeds.length*4)+'%';
+ $('telemetry').textContent=state.seeds.length+' spores · '+state.blooms.length+' blooms';
+ $('log').replaceChildren(...state.notes.map(s=>{const d=document.createElement('div');d.textContent='· '+s;return d}));
+ $('roletext').textContent=role<0?'Awaiting inoculation...':names[role]+' / '+(connected?'paired':'solo')+(role===1&&state.carry?' / carrying spore':'');
+ $('act').disabled=role===-1||!ready;$('heart').disabled=role===-1||!ready;
+ $('act').textContent=role===1?(state.carry?'◉ Deposit':'◉ Collect'):'✿ Cultivate';
+ $('help').textContent=role===1?'Collect a pink spore, swim to a white ring and deposit it.':'Cultivate spores for Fauna. Move by clicking or dragging.';
+}
+function status(s){$('status').textContent=s;updateUI()}
+function validPoint(p){return p&&Number.isFinite(p.x)&&Number.isFinite(p.y)}
+function action(who,kind){
+ if(kind==='heart'){signal[who]=performance.now();log(names[who]+' sent a little signal ♡');send({type:'signal',who});publish();return}
+ const p=state.players[who];
+ if(who===0){if(state.seeds.length>=24){flash('Spore nursery is full');return}state.seeds.push({...p,id:Math.round(rnd()*1e9)});log('Flora cultivated a pearl spore.');publish();return}
+ if(!state.carry){const i=state.seeds.findIndex(s=>gap(p,s)<.09);if(i<0){flash('Swim closer to a pink spore');send({type:'notice',text:'Swim closer to a pink spore'});return}state.seeds.splice(i,1);state.carry=true;log('Fauna collected a pearl spore.');publish();return}
+ const site=sites.find(s=>gap(p,s)<.10);
+ if(!site){flash('Find a white nursery ring');send({type:'notice',text:'Find a white nursery ring'});return}
+ state.carry=false;state.score++;state.blooms.push({...site,kind:state.score%5});if(state.blooms.length>80)state.blooms.shift();log('Symbiosis '+state.score+' · a new organism bloomed!');publish();
+}
+function accept(c){
+ if(conn&&conn.open){c.on('open',()=>{c.send({type:'notice',text:'This pond already has two players'});setTimeout(()=>c.close(),500)});return}
+ conn=c;c.on('open',()=>{connected=true;ready=true;status('● TWO ORGANISMS ONLINE');send({type:'hello',rev:state.rev});if(role===0)send({type:'state',state});});
+ c.on('data',m=>{
+ if(!m||typeof m!=='object')return;
+ if(m.type==='hello'&&role===1&&state.rev>m.rev)send({type:'restore',state});
+ if(m.type==='restore'&&role===0&&m.state?.rev>state.rev){state=m.state;publish()}
+ if(m.type==='state'&&role===1&&m.state?.rev>=state.rev){state=m.state;persist();updateUI()}
+ if(m.type==='move'&&role===0&&validPoint(m.p)){state.players[1]=point(clamp(m.p.x,0,1),clamp(m.p.y,0,1));}
+ if(m.type==='action'&&role===0&&['act','heart'].includes(m.kind))action(1,m.kind);
+ if(m.type==='signal'&&[0,1].includes(m.who))signal[m.who]=performance.now();
+ if(m.type==='notice')flash(String(m.text).slice(0,100));
+ });
+ c.on('close',()=>{connected=false;ready=role===0;status('○ PARTNER DISCONNECTED');if(role===1)setTimeout(reconnect,1500)});
+ c.on('error',()=>{connected=false;status('○ CONNECTION INTERRUPTED')});
+}
+function reconnect(){if(role!==1||connected||!peer?.open)return;accept(peer.connect('gcl-pond-'+room,{reliable:true}));}
+function choose(r){
+ if(role!==-1)return;
+ if(!window.Peer){status('○ NETWORK LIBRARY UNAVAILABLE');return}
+ role=r;$('host').disabled=$('guest').disabled=true;status('◌ CONNECTING...');
+ peer=r===0?new Peer('gcl-pond-'+room):new Peer();
+ peer.on('open',()=>{if(r===0){ready=true;status('○ WAITING FOR FAUNA')}else{status('◌ FINDING FLORA');reconnect()}});
+ peer.on('connection',c=>{if(role===0)accept(c);else c.close()});
+ peer.on('error',e=>{if(e.type==='peer-unavailable'&&role===1){status('○ WAITING FOR FLORA');setTimeout(reconnect,2500)}else{status('○ '+e.type.toUpperCase());flash('Reload to choose your specimen again.')}});
+ peer.on('disconnected',()=>{status('○ RECONNECTING');try{peer.reconnect()}catch{}});
+}
+$('host').onclick=()=>choose(0);$('guest').onclick=()=>choose(1);
+$('share').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);flash('Room link copied ♡')}catch{prompt('Copy this room link',location.href)}};
+function doAction(kind){if(!ready)return;if(role===0)action(0,kind);else send({type:'action',kind});}
+$('act').onclick=()=>doAction('act');$('heart').onclick=()=>doAction('heart');
+function locate(e){if(role<0||!ready)return;const rect=canvas.getBoundingClientRect();target=point(clamp((e.clientX-rect.left)/rect.width,.025,.975),clamp((e.clientY-rect.top)/rect.height,.025,.975));}
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);locate(e)});canvas.addEventListener('pointermove',e=>{if(e.buttons)locate(e)});
+const sites=[point(.23,.25),point(.76,.25),point(.49,.73),point(.81,.76),point(.16,.7)];
+const particles=Array.from({length:180},(_,i)=>({x:(Math.sin(i*231.7)*43758.5)%1,y:(Math.sin(i*73.51)*14378.5)%1,phase:i*2.3,r:1+i%3*.5}));
+function resize(){const rect=canvas.getBoundingClientRect();w=rect.width;h=rect.height;const d=Math.min(devicePixelRatio,2);canvas.width=w*d;canvas.height=h*d;ctx.setTransform(d,0,0,d,0,0)}
+new ResizeObserver(resize).observe(canvas);resize();
+function dot(x,y,r,c){ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
+function ring(x,y,r,c){ctx.strokeStyle=c;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke()}
+function organism(p,i,t){
+ const x=p.x*w,y=p.y*h,c=colors[i],r=15+Math.sin(t*3+i)*2;
+ dot(x,y,r+14,c+'0c');ring(x,y,r+8,c+'60');
+ ctx.save();ctx.translate(x,y);ctx.rotate(Math.sin(t*1.4+i)*.2);
+ for(let j=0;j<9;j++){let a=j*Math.PI*2/9+t*.3;dot(Math.cos(a)*r,Math.sin(a)*r,5+Math.sin(t*2+j)*1.5,c+'9f')}
+ dot(0,0,r,c);dot(-5,-2,2,'#30223d');dot(5,-2,2,'#30223d');ctx.strokeStyle='#30223d';ctx.beginPath();ctx.arc(0,2,4,0,Math.PI);ctx.stroke();
+ if(i===1&&state.carry)dot(0,-r-9,5,colors[0]);ctx.restore();
+ ctx.fillStyle=c;ctx.font='10px monospace';ctx.textAlign='center';ctx.fillText(names[i]+(role===i?' · YOU':''),x,y+r+22);
+ if(signal[i]&&performance.now()-signal[i]<2400){let q=(performance.now()-signal[i])/2400;ring(x,y,r+q*80,c+Math.round((1-q)*150).toString(16).padStart(2,'0'));ctx.font='24px monospace';ctx.fillText('♡',x,y-35-q*25)}
+}
+function frame(ms){
+ time=ms/1000;
+ if(target&&role>=0&&ready){const p=role===0?state.players[0]:display[1];p.x+=(target.x-p.x)*.045;p.y+=(target.y-p.y)*.045;if(role===0)display[0]={...p};if(ms-lastSend>70){if(role===1)send({type:'move',p});else send({type:'state',state});lastSend=ms}}
+ if(role===0&&connected&&ms-lastSend>100){send({type:'state',state});lastSend=ms}
+ for(let i=0;i<2;i++){if(i===role&&target)continue;display[i].x+=(state.players[i].x-display[i].x)*.18;display[i].y+=(state.players[i].y-display[i].y)*.18}
+ let bg=ctx.createRadialGradient(w*.5,h*.4,10,w*.5,h*.5,Math.max(w,h)*.75);bg.addColorStop(0,'#34274c');bg.addColorStop(1,'#110f22');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
+ ctx.strokeStyle='#a58dca18';ctx.lineWidth=1;
+ for(let y=0;y<h;y+=30){ctx.beginPath();for(let x=0;x<=w;x+=12){let yy=y+Math.sin(x*.018+y*.027+time*.5)*8+Math.sin(x*.008-time*.4)*9;x===0?ctx.moveTo(x,yy):ctx.lineTo(x,yy)}ctx.stroke()}
+ for(const p of particles){const x=((p.x+2+Math.sin(time*.13+p.phase)*.04)%1)*w,y=((p.y+2+time*.007*(1+p.r*.2))%1)*h;dot(x,y,p.r,'#cbb9ee44');if(p.r>1.8)ring(x,y,5,'#cbb9ee18')}
+ for(const s of sites){let x=s.x*w,y=s.y*h;ring(x,y,25,'#ece1ed66');ring(x,y,32,'#ece1ed22');dot(x,y,2,'#fff6');}
+ for(const b of state.blooms){const x=b.x*w,y=b.y*h;for(let j=0;j<12;j++){const a=j*Math.PI/6+time*.12+b.kind;dot(x+Math.cos(a)*(16+b.kind*2),y+Math.sin(a)*(16+b.kind*2),5,['#ffadcf','#b7acff','#abe8d8','#ffd5a9','#c5edff'][b.kind]+'77')}dot(x,y,8,'#f4e9ff');}
+ for(const s of state.seeds){dot(s.x*w,s.y*h,12,'#ffa8da19');ring(s.x*w,s.y*h,8,'#ffa8da90');dot(s.x*w,s.y*h,4,'#ffd6ed')}
+ for(let i=0;i<2;i++){const p=display[i];if(ms%80<17){trails[i].push({...p});if(trails[i].length>45)trails[i].shift()}trails[i].forEach((q,j)=>{ctx.globalAlpha=j/trails[i].length*.5;dot(q.x*w,q.y*h,1+j/25,colors[i])});ctx.globalAlpha=1;organism(p,i,time)}
+ requestAnimationFrame(frame);
+}
+setInterval(()=>{if(role===0&&ready)persist()},1500);
+updateUI();requestAnimationFrame(frame);
+</script></body></html>
